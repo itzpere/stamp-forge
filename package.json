@@ -1,16 +1,19 @@
 {
-  "name": "stamp",
+  "name": "stampforge",
   "version": "1.0.0",
-  "description": "SVG to 3D stamp converter",
+  "description": "Tool for creating 3D models from SVG files for stamps",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "scan": "node scan-gallery.js",
     "dev": "nodemon server.js"
   },
   "dependencies": {
     "express": "^4.18.2"
   },
   "devDependencies": {
-    "nodemon": "^2.0.22"
-  }
+    "nodemon": "^3.0.1"
+  },
+  "author": "",
+  "license": "MIT"
 }

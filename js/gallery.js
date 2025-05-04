@@ -1,29 +1,22 @@
-// SVG Gallery functionality - LOCAL FILES ONLY
+// Gallery loading script - Static version for GitHub Pages
 
-// Load SVG gallery when the page loads
-document.addEventListener('DOMContentLoaded', loadSvgGallery);
+// Load the gallery when the document is ready
+document.addEventListener('DOMContentLoaded', loadGallery);
 
-// Current selected gallery item
-let currentSelectedItem = null;
-
-// Function to load the SVG gallery
-function loadSvgGallery() {
+// Function to load the gallery
+function loadGallery() {
     const galleryContainer = document.getElementById('gallery-container');
-    const loadingElement = document.getElementById('gallery-loading');
-    const errorElement = document.getElementById('gallery-error');
+    const galleryLoading = document.getElementById('gallery-loading');
+    const galleryError = document.getElementById('gallery-error');
     
-    if (!galleryContainer || !loadingElement || !errorElement) {
-        console.error('Gallery elements not found in DOM');
-        return;
-    }
+    if (!galleryContainer) return;
     
-    // Show loading, hide container and error
-    loadingElement.classList.remove('hidden');
-    galleryContainer.classList.add('hidden');
-    errorElement.classList.add('hidden');
+    // Show loading indicator
+    if (galleryLoading) galleryLoading.classList.remove('hidden');
+    if (galleryError) galleryError.classList.add('hidden');
     
-    // Fetch SVG list from server (local files only)
-    fetch('/api/list-svgs')
+    // Load from static JSON file instead of API endpoint
+    fetch('svgs/gallery.json')
         .then(response => {
             if (!response.ok) {
                 throw new Error(`Server returned ${response.status}: ${response.statusText}`);
@@ -31,200 +24,228 @@ function loadSvgGallery() {
             return response.json();
         })
         .then(data => {
-            // Hide loading
-            loadingElement.classList.add('hidden');
+            // Hide loading indicator
+            if (galleryLoading) galleryLoading.classList.add('hidden');
             
-            if (!data.files || data.files.length === 0) {
-                // Show message if no files found
-                errorElement.textContent = 'No SVG files found in gallery. Add SVG files to the svgs folder.';
-                errorElement.classList.remove('hidden');
+            // Check if we have images
+            if (!data.images || data.images.length === 0) {
+                showGalleryError('No SVG files found. Add SVG files to the "svgs" directory.');
                 return;
             }
             
-            // Sort files by name for consistent display
-            data.files.sort((a, b) => a.name.localeCompare(b.name));
-            
-            // Clear existing content
-            galleryContainer.innerHTML = '';
-            
             // Create gallery items
-            data.files.forEach(file => {
-                const galleryItem = document.createElement('div');
-                galleryItem.className = 'gallery-item';
-                galleryItem.dataset.path = file.path;
-                galleryItem.dataset.name = file.name;
-                
-                // Create thumbnail
-                const thumbnail = document.createElement('img');
-                thumbnail.className = 'gallery-thumbnail';
-                thumbnail.src = file.path;
-                thumbnail.alt = file.name;
-                thumbnail.onerror = () => {
-                    // Show a placeholder if SVG fails to load
-                    thumbnail.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2VlZSIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEycHgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGFsaWdubWVudC1iYXNlbGluZT0ibWlkZGxlIiBmaWxsPSIjOTk5Ij5FcnJvcjwvdGV4dD48L3N2Zz4=';
-                };
-                
-                // Create filename label
-                const nameLabel = document.createElement('div');
-                nameLabel.className = 'gallery-item-name';
-                nameLabel.textContent = file.name;
-                
-                // Add click handler
-                galleryItem.addEventListener('click', () => {
-                    selectAndLoadSvg(galleryItem);
-                });
-                
-                // Assemble gallery item
-                galleryItem.appendChild(thumbnail);
-                galleryItem.appendChild(nameLabel);
-                galleryContainer.appendChild(galleryItem);
+            data.images.forEach(image => {
+                const item = createGalleryItem(image);
+                galleryContainer.appendChild(item);
             });
             
-            // Show gallery
-            galleryContainer.classList.remove('hidden');
-            
+            console.log(`Loaded ${data.images.length} SVG files in gallery`);
         })
         .catch(error => {
-            console.error('Error loading SVG gallery:', error);
-            loadingElement.classList.add('hidden');
-            errorElement.textContent = `Error loading gallery: ${error.message}`;
-            errorElement.classList.remove('hidden');
+            console.error('Error loading gallery:', error);
+            showGalleryError(`Error loading gallery: ${error.message}`);
         });
 }
 
-// Function to select and load an SVG from the gallery
-function selectAndLoadSvg(galleryItem) {
-    // Show loading indicator
-    document.getElementById('loading').classList.remove('hidden');
-    document.getElementById('loading').textContent = 'Loading SVG...';
+// Show gallery error
+function showGalleryError(message) {
+    const galleryLoading = document.getElementById('gallery-loading');
+    const galleryError = document.getElementById('gallery-error');
     
-    // Update selected item styling
-    if (currentSelectedItem) {
-        currentSelectedItem.classList.remove('gallery-item-selected');
+    if (galleryLoading) galleryLoading.classList.add('hidden');
+    if (galleryError) {
+        galleryError.textContent = message;
+        galleryError.classList.remove('hidden');
     }
-    galleryItem.classList.add('gallery-item-selected');
-    currentSelectedItem = galleryItem;
+}
+
+// Create a gallery item
+function createGalleryItem(image) {
+    const item = document.createElement('div');
+    item.className = 'gallery-item';
     
-    const svgPath = galleryItem.dataset.path;
-    const svgName = galleryItem.dataset.name;
+    // Create SVG container with fixed dimensions
+    const svgContainer = document.createElement('div');
+    svgContainer.className = 'svg-container';
     
-    // Store the SVG filename (without extension) for export
-    currentSvgFilename = svgName.replace(/\.svg$/i, "");
+    // Create img element with proper styling for SVGs
+    const img = document.createElement('img');
+    img.src = image.path;
+    img.alt = image.name;
+    img.title = image.name;
+    img.className = 'gallery-svg';
     
-    console.log(`Loading SVG from gallery: ${svgName}`);
+    // Add error handling for SVG loading issues
+    img.onerror = function() {
+        this.onerror = null;
+        this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"%3E%3Crect width="100" height="100" fill="%23f8f8f8"/%3E%3Ctext x="50" y="50" font-family="Arial" font-size="12" text-anchor="middle" dominant-baseline="middle" fill="%23999"%3EError%3C/text%3E%3C/svg%3E';
+        console.error(`Failed to load SVG: ${image.path}`);
+    };
+    
+    svgContainer.appendChild(img);
+    
+    // Add SVG name below image
+    const nameEl = document.createElement('div');
+    nameEl.className = 'gallery-item-name';
+    nameEl.textContent = image.name.replace(/\.svg$/, '');
+    
+    // Assemble the item
+    item.appendChild(svgContainer);
+    item.appendChild(nameEl);
+    
+    // Add click event to load the SVG
+    item.addEventListener('click', () => {
+        loadSVGFromGallery(image.path, image.name);
+    });
+    
+    return item;
+}
+
+// Load SVG from gallery
+function loadSVGFromGallery(path, name) {
+    console.log(`Loading SVG: ${path}`);
+    
+    // Show loading indicator
+    const loadingElement = document.getElementById('loading');
+    if (loadingElement) {
+        loadingElement.textContent = `Loading ${name}...`;
+        loadingElement.classList.remove('hidden');
+    }
     
     // Fetch the SVG file
-    fetch(svgPath)
+    fetch(path)
         .then(response => {
             if (!response.ok) {
-                throw new Error(`Failed to load SVG: ${response.status} ${response.statusText}`);
+                throw new Error(`Server returned ${response.status}: ${response.statusText}`);
             }
             return response.text();
         })
         .then(svgData => {
-            // Clean up previous SVG resources
-            if (typeof cleanupPreviousSVG === 'function') {
-                cleanupPreviousSVG();
-            }
+            console.log(`SVG loaded: ${name} (${svgData.length} bytes)`);
             
-            // Store SVG data for reuse - use global lastSvgData variable defined in globals.js
-            if (window.lastSvgData !== undefined) {
-                window.lastSvgData = svgData;
+            // Process the SVG
+            if (typeof handleSVGData === 'function') {
+                handleSVGData(svgData, name);
             } else {
-                // Fallback - create lastSvgData if it doesn't exist
-                window.lastSvgData = svgData;
+                // If handleSVGData isn't defined, use the SVG directly
+                processSVGDirectly(svgData, name);
             }
             
-            // Create a temporary img element to load the SVG
-            const img = new Image();
+            // Enable download button
+            const downloadBtn = document.getElementById('downloadSTL');
+            if (downloadBtn) downloadBtn.disabled = false;
             
-            img.onload = function() {
-                // Process the SVG for extrusion only, without applying texture to brick
-                try {
-                    if (typeof scheduleInitialSVGParsing === 'function') {
-                        scheduleInitialSVGParsing(svgData);
-                    } else if (typeof parseSVGForExtrusion === 'function') {
-                        parseSVGForExtrusion(svgData, true, 0.2);
-                    } else {
-                        console.error("SVG processing functions not available");
-                    }
-                    
-                    // Enable STL download button
-                    const downloadButton = document.getElementById('downloadSTL');
-                    if (downloadButton) {
-                        downloadButton.disabled = false;
-                    }
-                } catch (error) {
-                    console.error('Error processing gallery SVG:', error);
-                } finally {
-                    // Hide loading indicator
-                    document.getElementById('loading').classList.add('hidden');
-                }
-            };
-            
-            img.onerror = function(e) {
-                console.error('Error loading gallery SVG into Image:', e);
-                document.getElementById('loading').classList.add('hidden');
-                alert('Error processing SVG. Please try another file.');
-            };
-            
-            // Load the SVG data into the image
-            try {
-                // Convert SVG to data URL
-                const svgBlob = new Blob([svgData], {type: 'image/svg+xml'});
-                const url = URL.createObjectURL(svgBlob);
-                
-                // Use a proper event handler approach - don't try to call onload
-                const originalOnload = img.onload; 
-                img.onload = function() {
-                    URL.revokeObjectURL(url);
-                    if (originalOnload) {
-                        originalOnload.call(img);  // Call original handler with correct this context
-                    }
-                };
-                
-                img.src = url;
-            } catch (error) {
-                console.error('Error creating SVG blob:', error);
-                
-                // Fallback to base64 encoding
-                try {
-                    const base64String = btoa(unescape(encodeURIComponent(svgData)));
-                    img.src = 'data:image/svg+xml;base64,' + base64String;
-                } catch (base64Error) {
-                    console.error('Error encoding SVG as base64:', base64Error);
-                    document.getElementById('loading').classList.add('hidden');
-                    alert('Error processing SVG. The file may be corrupted.');
-                }
-            }
+            // Hide loading indicator
+            if (loadingElement) loadingElement.classList.add('hidden');
         })
         .catch(error => {
-            console.error('Error fetching SVG from gallery:', error);
-            document.getElementById('loading').classList.add('hidden');
+            console.error('Error loading SVG from gallery:', error);
             alert(`Error loading SVG: ${error.message}`);
+            if (loadingElement) loadingElement.classList.add('hidden');
         });
 }
 
-// Function to refresh the gallery
-function refreshGallery() {
-    loadSvgGallery();
-}
-
-// Add a refresh button to the gallery
-function addRefreshButton() {
-    const gallerySection = document.querySelector('.svg-gallery-section h3');
-    if (gallerySection) {
-        const refreshButton = document.createElement('button');
-        refreshButton.textContent = 'Refresh';
-        refreshButton.className = 'gallery-refresh-btn';
-        refreshButton.style.marginLeft = '10px';
-        refreshButton.style.fontSize = '0.8em';
-        refreshButton.style.padding = '3px 8px';
-        refreshButton.addEventListener('click', refreshGallery);
+// Process SVG directly if handleSVGData is not defined
+function processSVGDirectly(svgData, filename) {
+    // Store SVG data for later use
+    window.lastSvgData = svgData;
+    window.currentSvgFilename = filename.replace(/\.svg$/i, '');
+    
+    // Create an image from the SVG data
+    const img = new Image();
+    img.onload = function() {
+        // Create canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = 1024;
+        canvas.height = 1024;
+        const ctx = canvas.getContext('2d');
         
-        gallerySection.appendChild(refreshButton);
+        // Draw SVG to canvas
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Calculate dimensions to maintain aspect ratio
+        const imgAspect = img.width / img.height;
+        const canvasAspect = canvas.width / canvas.height;
+        let drawWidth, drawHeight, offsetX = 0, offsetY = 0;
+        
+        if (imgAspect > canvasAspect) {
+            drawWidth = canvas.width;
+            drawHeight = canvas.width / imgAspect;
+            offsetY = (canvas.height - drawHeight) / 2;
+        } else {
+            drawHeight = canvas.height;
+            drawWidth = canvas.height * imgAspect;
+            offsetX = (canvas.width - drawWidth) / 2;
+        }
+        
+        ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+        
+        // Check if Three.js objects exist before applying texture
+        if (typeof THREE !== 'undefined') {
+            // Create texture and apply to brick
+            if (window.texture) window.texture.dispose();
+            window.texture = new THREE.CanvasTexture(canvas);
+            
+            if (window.renderer && window.renderer.capabilities) {
+                window.texture.anisotropy = window.renderer.capabilities.getMaxAnisotropy();
+            }
+            
+            if (window.brick && window.brick.material) {
+                if (Array.isArray(window.brick.material) && window.brick.material.length > 2) {
+                    if (window.brick.material[2].map) window.brick.material[2].map.dispose();
+                    window.brick.material[2].dispose();
+                    window.brick.material[2] = new THREE.MeshStandardMaterial({
+                        map: window.texture, 
+                        roughness: 0.7, 
+                        metalness: 0.1, 
+                        name: 'top-textured'
+                    });
+                    window.brick.material[2].needsUpdate = true;
+                }
+            }
+            
+            // Process SVG for extrusion if the function exists
+            if (typeof window.scheduleInitialSVGParsing === 'function') {
+                window.scheduleInitialSVGParsing(svgData);
+            } else if (typeof window.parseSVGForExtrusion === 'function') {
+                window.parseSVGForExtrusion(svgData, true, 0.2);
+            }
+        }
+    };
+    
+    img.onerror = function(e) {
+        console.error('Error loading SVG into image:', e);
+        alert('Error processing SVG. The file might be corrupted.');
+        const loadingElement = document.getElementById('loading');
+        if (loadingElement) loadingElement.classList.add('hidden');
+    };
+    
+    // Set the SVG data as the image source
+    try {
+        const svgBlob = new Blob([svgData], {type: 'image/svg+xml'});
+        const url = URL.createObjectURL(svgBlob);
+        
+        // Clean up URL object when done
+        img.onload = function() {
+            URL.revokeObjectURL(url);
+            this.onload = null; // Avoid infinite recursion
+            this.onload = function() {
+                // Create canvas
+                const canvas = document.createElement('canvas');
+                canvas.width = 1024;
+                canvas.height = 1024;
+                const ctx = canvas.getContext('2d');
+                
+                // Process as above...
+                // ...existing code for processing image...
+            };
+        };
+        
+        img.src = url;
+    } catch (e) {
+        console.error('Error creating SVG blob:', e);
+        // Fallback to base64 encoding
+        img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
     }
 }
-
-// Call to add refresh button when page loads
-document.addEventListener('DOMContentLoaded', addRefreshButton);

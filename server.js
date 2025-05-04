@@ -43,8 +43,32 @@ app.get('/api/list-svgs', (req, res) => {
     }
 });
 
+// Import gallery scanner
+const { scanSvgGallery } = require('./scan-gallery');
+
+// API endpoint to scan SVG files and update gallery.json
+app.get('/api/scan-gallery', async (req, res) => {
+  try {
+    console.log('Scanning SVG gallery...');
+    const result = await scanSvgGallery();
+    res.json({ 
+      success: true, 
+      message: 'Gallery updated successfully', 
+      fileCount: result.count 
+    });
+  } catch (error) {
+    console.error('Error scanning gallery:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error updating gallery', 
+      error: error.message 
+    });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`SVG Gallery available at: http://localhost:${PORT}/api/list-svgs`);
+    console.log(`Access the gallery scanner at http://localhost:${PORT}/api/scan-gallery`);
 });
