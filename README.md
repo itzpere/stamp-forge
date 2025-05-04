@@ -2,7 +2,7 @@
 
 StampForge is an open-source tool for creating 3D models from SVG files, designed for easy 3D printing of custom stamps and similar objects.
 
-![StampForge Screenshot](stampforge.jpg)
+![StampForge Screenshot](stampForge.jpg)
 
 ## Features
 
