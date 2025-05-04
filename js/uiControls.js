@@ -35,7 +35,7 @@ function setupUIControls() {
         const extrusionZEl = document.getElementById('extrusionZ');
         
         if (extrusionXEl) extrusionXEl.value = extrusionPosition.x;
-        if (extrusionYEl) extrusionYEl.value = extrusionPosition.y;
+        if (extrusionYEl) extrusionYEl.value = 0.6; // Always set Y input to 0.6
         if (extrusionZEl) extrusionZEl.value = extrusionPosition.z;
         
         if (extrusionXEl) extrusionXEl.addEventListener('change', updateExtrusionPosition);
@@ -356,5 +356,39 @@ function updateTriangleColor() {
         mirrorTriangleMesh.material.needsUpdate = true;
     } else {
         console.warn("mirrorTriangleMesh or its material not found");
+    }
+}
+
+// Update extrusion position (for 'change' events)
+function updateExtrusionPosition() {
+    extrusionPosition.x = parseFloat(document.getElementById('extrusionX').value);
+    extrusionPosition.y = parseFloat(document.getElementById('extrusionY').value); // Use user's Y value
+    extrusionPosition.z = parseFloat(document.getElementById('extrusionZ').value);
+    
+    // Update the extrusion position in the scene
+    if (extrudedGroup) {
+        extrudedGroup.position.copy(extrusionPosition);
+    }
+}
+
+// Optimized position update with debouncing (for 'input' events)
+function optimizedPositionUpdate() {
+    extrusionPosition.x = parseFloat(document.getElementById('extrusionX').value);
+    extrusionPosition.y = parseFloat(document.getElementById('extrusionY').value); // Use user's Y value
+    extrusionPosition.z = parseFloat(document.getElementById('extrusionZ').value);
+    
+    if (isUserInteracting) {
+        pendingUpdate = true;
+        debounce(() => {
+            // Update the position without rebuilding
+            if (extrudedGroup) {
+                extrudedGroup.position.copy(extrusionPosition);
+            }
+        });
+    } else {
+        // Immediate update if not interacting
+        if (extrudedGroup) {
+            extrudedGroup.position.copy(extrusionPosition);
+        }
     }
 }

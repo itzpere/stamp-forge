@@ -191,8 +191,10 @@ function updateExtrusionColor() {
 // Update extrusion position based on UI inputs
 function updateExtrusionPosition() {
     extrusionPosition.x = parseFloat(document.getElementById('extrusionX').value);
-    extrusionPosition.y = parseFloat(document.getElementById('extrusionY').value);
     extrusionPosition.z = parseFloat(document.getElementById('extrusionZ').value);
+    
+    // IMPORTANT: Always force Y position to 0.6
+    extrusionPosition.y = 0.6;
     
     // Reposition all extrusions
     if (extrudedGroup && extrudedGroup.children.length > 0) {
@@ -206,8 +208,10 @@ function updateExtrusionPosition() {
 // Optimized position update
 function optimizedPositionUpdate() {
     extrusionPosition.x = parseFloat(document.getElementById('extrusionX').value);
-    extrusionPosition.y = parseFloat(document.getElementById('extrusionY').value);
     extrusionPosition.z = parseFloat(document.getElementById('extrusionZ').value);
+    
+    // IMPORTANT: Always force Y position to 0.6
+    extrusionPosition.y = 0.6;
     
     renderer.shadowMap.enabled = false;
     
