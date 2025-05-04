@@ -6,6 +6,10 @@ StampForge is an open-source tool for creating 3D models from SVG files, designe
 
 ![StampForge Screenshot](stampForge.jpg)
 
+## 👤 Author
+
+**Created by Petar Miletić** - [github.com/itzpere](https://github.com/itzpere)
+
 ## 🔴 Essential Downloads
 
 **[DOWNLOAD STAMP HOLDER](https://www.printables.com/model/stampforge-holder)** - This holder is required to use your created stamps

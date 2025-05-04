@@ -98,6 +98,36 @@
             border-radius: 4px;
             font-style: italic;
         }
+        
+        .author-info {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .author-info p {
+            margin: 5px 0;
+        }
+        
+        .author-info a {
+            display: flex;
+            align-items: center;
+            color: #0366d6;
+            font-weight: bold;
+            text-decoration: none;
+        }
+        
+        .author-info a:hover {
+            text-decoration: underline;
+        }
+        
+        .github-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+        }
     </style>
 </head>
 <body>
@@ -177,6 +207,10 @@
             <div class="info-section">
                 <h4>About This Project:</h4>
                 <p>StampForge is an open-source tool for creating 3D models from SVG files, designed for easy 3D printing of custom stamps and similar objects.</p>
+                <div class="author-info">
+                    <p><strong>Created by:</strong> Petar Miletić</p>
+                    <p><a href="https://github.com/itzpere" target="_blank"><img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" class="github-icon" alt="GitHub"> github.com/itzpere</a></p>
+                </div>
             </div>
             
             <div class="info-section">

@@ -287,43 +287,50 @@ button:disabled {
 .svg-gallery {
   margin-top: 20px;
   position: relative;
-  min-height: 100px;
+  min-height: 120px;
 }
 
 .gallery-container {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 15px;
-  padding: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 20px;
+  padding: 15px;
 }
 
 .gallery-item {
   cursor: pointer;
   border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 5px;
+  border-radius: 6px;
+  padding: 10px;
   background: white;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
   display: flex;
   flex-direction: column;
   align-items: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
 .gallery-item:hover {
-  transform: translateY(-3px);
+  transform: translateY(-5px);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+  border-color: #28a745;
+}
+
+.gallery-item:active {
+  transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-  border-color: #999;
 }
 
 .svg-container {
-  width: 80px;
-  height: 80px;
+  width: 120px;
+  height: 120px;
   display: flex;
   align-items: center;
   justify-content: center;
   background-color: #f9f9f9;
-  border-radius: 3px;
+  border-radius: 5px;
   overflow: hidden;
+  margin-bottom: 8px;
 }
 
 .gallery-svg {
@@ -331,13 +338,14 @@ button:disabled {
   max-height: 100%;
   object-fit: contain;
   background-color: white;
+  padding: 5px;
 }
 
 .gallery-item-name {
   margin-top: 8px;
-  font-size: 12px;
+  font-size: 13px;
   text-align: center;
-  max-width: 90px;
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

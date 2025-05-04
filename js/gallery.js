@@ -34,6 +34,7 @@ function loadGallery() {
             }
             
             // Create gallery items
+            galleryContainer.innerHTML = ''; // Clear existing content
             data.images.forEach(image => {
                 const item = createGalleryItem(image);
                 galleryContainer.appendChild(item);
@@ -95,6 +96,7 @@ function createGalleryItem(image) {
     
     // Add click event to load the SVG
     item.addEventListener('click', () => {
+        console.log('Gallery item clicked:', image.name);
         loadSVGFromGallery(image.path, image.name);
     });
     
@@ -112,6 +114,9 @@ function loadSVGFromGallery(path, name) {
         loadingElement.classList.remove('hidden');
     }
     
+    // CRITICAL FIX: Clean up previous resources before loading a new SVG
+    cleanupPreviousResources();
+    
     // Fetch the SVG file
     fetch(path)
         .then(response => {
@@ -123,20 +128,141 @@ function loadSVGFromGallery(path, name) {
         .then(svgData => {
             console.log(`SVG loaded: ${name} (${svgData.length} bytes)`);
             
-            // Process the SVG
-            if (typeof handleSVGData === 'function') {
-                handleSVGData(svgData, name);
-            } else {
-                // If handleSVGData isn't defined, use the SVG directly
-                processSVGDirectly(svgData, name);
+            // Store the SVG data globally for reuse
+            window.lastSvgData = svgData;
+            window.currentSvgFilename = name.replace(/\.svg$/i, "");
+            
+            // Create image to load the SVG for the texture
+            const img = new Image();
+            img.onload = function() {
+                console.log(`SVG image loaded, creating canvas texture`);
+                // Create canvas and draw SVG
+                const canvas = document.createElement('canvas');
+                canvas.width = 1024;
+                canvas.height = 1024;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw SVG with proper dimensions
+                const imgAspect = img.width / img.height;
+                const canvasAspect = canvas.width / canvas.height;
+                let drawWidth, drawHeight, offsetX = 0, offsetY = 0;
+                
+                if (imgAspect > canvasAspect) {
+                    drawWidth = canvas.width;
+                    drawHeight = canvas.width / imgAspect;
+                    offsetY = (canvas.height - drawHeight) / 2;
+                } else {
+                    drawHeight = canvas.height;
+                    drawWidth = canvas.height * imgAspect;
+                    offsetX = (canvas.width - drawWidth) / 2;
+                }
+                
+                ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+                
+                // Create texture for the brick
+                if (window.texture) window.texture.dispose();
+                window.texture = new THREE.CanvasTexture(canvas);
+                
+                if (window.renderer && window.renderer.capabilities) {
+                    window.texture.anisotropy = window.renderer.capabilities.getMaxAnisotropy();
+                }
+                
+                // Apply texture to brick
+                if (window.brick && window.brick.material) {
+                    if (Array.isArray(window.brick.material) && window.brick.material.length > 2) {
+                        if (window.brick.material[2].map) window.brick.material[2].map.dispose();
+                        window.brick.material[2].dispose();
+                        window.brick.material[2] = new THREE.MeshStandardMaterial({
+                            map: window.texture, 
+                            roughness: 0.7, 
+                            metalness: 0.1, 
+                            name: 'top-textured'
+                        });
+                        window.brick.material[2].needsUpdate = true;
+                    }
+                }
+                
+                // CRITICAL FIX: Get scene from globals or find it in a more reliable way
+                let scene = null;
+                
+                // Try multiple ways to get the scene
+                if (typeof window.scene !== 'undefined') {
+                    scene = window.scene;
+                } else if (typeof scene !== 'undefined') {
+                    // Scene might be a local variable in another scope
+                    console.log("Using local scene variable");
+                } else {
+                    // Last resort: Check if brick is in a scene we can access
+                    if (window.brick && window.brick.parent) {
+                        scene = window.brick.parent;
+                        console.log("Accessed scene through brick.parent");
+                    }
+                }
+                
+                // CRITICAL FIX: Create extruded group if it doesn't exist properly
+                if (!window.extrudedGroup) {
+                    console.log("Creating new extrudedGroup");
+                    window.extrudedGroup = new THREE.Group();
+                    
+                    // Add to scene if we have access to it
+                    if (scene) {
+                        scene.add(window.extrudedGroup);
+                    } else {
+                        console.warn("Could not add extrudedGroup to scene - scene not accessible");
+                    }
+                }
+                
+                // Process SVG for extrusion with a fresh state
+                console.log('Processing SVG for extrusion');
+                
+                // CRITICAL FIX: Always force a complete rebuild when loading from gallery
+                if (typeof window.parseSVGForExtrusion === 'function') {
+                    try {
+                        // Force complete rebuild with immediate (non-progressive) quality
+                        window.parseSVGForExtrusion(svgData, false, 0.5);
+                    } catch (error) {
+                        console.error("Error in parseSVGForExtrusion:", error);
+                        alert("Error processing SVG. Please try a different file.");
+                    }
+                } else {
+                    console.error('parseSVGForExtrusion function not found');
+                    alert("Could not find SVG processing function. The application may need to be reloaded.");
+                }
+                
+                // Enable download button
+                const downloadBtn = document.getElementById('downloadSTL');
+                if (downloadBtn) downloadBtn.disabled = false;
+                
+                // Hide loading indicator
+                if (loadingElement) loadingElement.classList.add('hidden');
+            };
+            
+            img.onerror = function(e) {
+                console.error('Error loading SVG into image:', e);
+                alert('Error processing SVG. The file might be corrupted.');
+                if (loadingElement) loadingElement.classList.add('hidden');
+            };
+            
+            // Set the SVG data as the image source
+            try {
+                const svgBlob = new Blob([svgData], {type: 'image/svg+xml'});
+                const url = URL.createObjectURL(svgBlob);
+                
+                // Setup cleanup for URL object
+                const originalOnload = img.onload;
+                img.onload = function() {
+                    URL.revokeObjectURL(url);
+                    if (originalOnload) originalOnload.call(this);
+                };
+                
+                img.src = url;
+            } catch (e) {
+                console.error('Error creating SVG blob:', e);
+                // Fallback to base64 encoding
+                img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
             }
-            
-            // Enable download button
-            const downloadBtn = document.getElementById('downloadSTL');
-            if (downloadBtn) downloadBtn.disabled = false;
-            
-            // Hide loading indicator
-            if (loadingElement) loadingElement.classList.add('hidden');
         })
         .catch(error => {
             console.error('Error loading SVG from gallery:', error);
@@ -145,107 +271,59 @@ function loadSVGFromGallery(path, name) {
         });
 }
 
-// Process SVG directly if handleSVGData is not defined
-function processSVGDirectly(svgData, filename) {
-    // Store SVG data for later use
-    window.lastSvgData = svgData;
-    window.currentSvgFilename = filename.replace(/\.svg$/i, '');
+// CRITICAL FIX: Add cleanup function for previous resources
+function cleanupPreviousResources() {
+    console.log("Cleaning up previous resources");
     
-    // Create an image from the SVG data
-    const img = new Image();
-    img.onload = function() {
-        // Create canvas
-        const canvas = document.createElement('canvas');
-        canvas.width = 1024;
-        canvas.height = 1024;
-        const ctx = canvas.getContext('2d');
-        
-        // Draw SVG to canvas
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Calculate dimensions to maintain aspect ratio
-        const imgAspect = img.width / img.height;
-        const canvasAspect = canvas.width / canvas.height;
-        let drawWidth, drawHeight, offsetX = 0, offsetY = 0;
-        
-        if (imgAspect > canvasAspect) {
-            drawWidth = canvas.width;
-            drawHeight = canvas.width / imgAspect;
-            offsetY = (canvas.height - drawHeight) / 2;
-        } else {
-            drawHeight = canvas.height;
-            drawWidth = canvas.height * imgAspect;
-            offsetX = (canvas.width - drawWidth) / 2;
-        }
-        
-        ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
-        
-        // Check if Three.js objects exist before applying texture
-        if (typeof THREE !== 'undefined') {
-            // Create texture and apply to brick
-            if (window.texture) window.texture.dispose();
-            window.texture = new THREE.CanvasTexture(canvas);
+    // Clean up texture
+    if (window.texture) {
+        window.texture.dispose();
+        window.texture = null;
+    }
+    
+    // Clean up extrusion group
+    if (window.extrudedGroup) {
+        while (window.extrudedGroup.children.length > 0) {
+            const child = window.extrudedGroup.children[0];
+            window.extrudedGroup.remove(child);
             
-            if (window.renderer && window.renderer.capabilities) {
-                window.texture.anisotropy = window.renderer.capabilities.getMaxAnisotropy();
+            if (child.geometry) {
+                child.geometry.dispose();
             }
             
-            if (window.brick && window.brick.material) {
-                if (Array.isArray(window.brick.material) && window.brick.material.length > 2) {
-                    if (window.brick.material[2].map) window.brick.material[2].map.dispose();
-                    window.brick.material[2].dispose();
-                    window.brick.material[2] = new THREE.MeshStandardMaterial({
-                        map: window.texture, 
-                        roughness: 0.7, 
-                        metalness: 0.1, 
-                        name: 'top-textured'
+            if (child.material) {
+                if (Array.isArray(child.material)) {
+                    child.material.forEach(m => {
+                        if (m.map) m.map.dispose();
+                        m.dispose();
                     });
-                    window.brick.material[2].needsUpdate = true;
+                } else {
+                    if (child.material.map) child.material.map.dispose();
+                    child.material.dispose();
                 }
             }
-            
-            // Process SVG for extrusion if the function exists
-            if (typeof window.scheduleInitialSVGParsing === 'function') {
-                window.scheduleInitialSVGParsing(svgData);
-            } else if (typeof window.parseSVGForExtrusion === 'function') {
-                window.parseSVGForExtrusion(svgData, true, 0.2);
-            }
         }
-    };
-    
-    img.onerror = function(e) {
-        console.error('Error loading SVG into image:', e);
-        alert('Error processing SVG. The file might be corrupted.');
-        const loadingElement = document.getElementById('loading');
-        if (loadingElement) loadingElement.classList.add('hidden');
-    };
-    
-    // Set the SVG data as the image source
-    try {
-        const svgBlob = new Blob([svgData], {type: 'image/svg+xml'});
-        const url = URL.createObjectURL(svgBlob);
-        
-        // Clean up URL object when done
-        img.onload = function() {
-            URL.revokeObjectURL(url);
-            this.onload = null; // Avoid infinite recursion
-            this.onload = function() {
-                // Create canvas
-                const canvas = document.createElement('canvas');
-                canvas.width = 1024;
-                canvas.height = 1024;
-                const ctx = canvas.getContext('2d');
-                
-                // Process as above...
-                // ...existing code for processing image...
-            };
-        };
-        
-        img.src = url;
-    } catch (e) {
-        console.error('Error creating SVG blob:', e);
-        // Fallback to base64 encoding
-        img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
     }
+    
+    // Reset any pending operations
+    if (typeof window.cancelProgressiveRendering === 'function') {
+        window.cancelProgressiveRendering();
+    }
+    
+    // Reset interaction flags
+    window.isUserInteracting = false;
+    window.pendingUpdate = false;
+    
+    // Clear any timeouts
+    if (window.updateTimeout) {
+        clearTimeout(window.updateTimeout);
+        window.updateTimeout = null;
+    }
+    
+    if (window.qualityTransitionTimeout) {
+        clearTimeout(window.qualityTransitionTimeout);
+        window.qualityTransitionTimeout = null;
+    }
+    
+    console.log("Resource cleanup complete");
 }
