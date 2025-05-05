@@ -14,28 +14,69 @@ function setupUIControls() {
             });
         }
         
-        // SVG scale factor control
+        // SVG scale factor control - COMPLETE FIX FOR SCALING ISSUES
         const svgScaleEl = document.getElementById('svgScale');
         if (svgScaleEl) {
+            // First, ensure the input value matches the global value
             svgScaleEl.value = svgScaleFactor;
+            console.log(`Initializing scale input with value: ${svgScaleFactor}`);
+            
+            // Complete replacement for event handlers on scale input
+            svgScaleEl.addEventListener('input', function() {
+                const newValue = parseFloat(this.value);
+                if (!isNaN(newValue) && newValue > 0) {
+                    // Directly update global with immediate effect
+                    window.svgScaleFactor = newValue;
+                    console.log(`Scale input changed to: ${newValue} (set global to ${window.svgScaleFactor})`);
+                    
+                    // Force immediate update with low quality for responsiveness
+                    if (lastSvgData) {
+                        // Skip debouncing for immediate feedback
+                        renderer.shadowMap.enabled = false;
+                        console.log(`Applying immediate scale update: ${window.svgScaleFactor}`);
+                        parseSVGForExtrusion(lastSvgData, true, 0.4);
+                    }
+                }
+            });
+            
+            // Add separate change handler for final high-quality update
             svgScaleEl.addEventListener('change', function() {
-                svgScaleFactor = parseFloat(this.value);
-                if (texture) {
-                    // Use default quality for non-interactive changes
-                    parseSVGForExtrusion(lastSvgData, false, maxInteractiveQuality);
+                const newValue = parseFloat(this.value);
+                if (!isNaN(newValue) && newValue > 0) {
+                    window.svgScaleFactor = newValue;
+                    
+                    if (lastSvgData) {
+                        console.log(`Applying final scale update with high quality: ${window.svgScaleFactor}`);
+                        // Force complete rebuild at higher quality when input loses focus
+                        parseSVGForExtrusion(lastSvgData, false, maxInteractiveQuality);
+                    }
+                }
+            });
+            
+            // Add another safeguard for blur events
+            svgScaleEl.addEventListener('blur', function() {
+                const newValue = parseFloat(this.value);
+                if (!isNaN(newValue) && newValue > 0) {
+                    // Ensure proper global update on blur
+                    window.svgScaleFactor = newValue;
+                    console.log(`Scale input blur - final value: ${window.svgScaleFactor}`);
+                    
+                    // Final check - update if needed
+                    if (newValue !== svgScaleFactor && lastSvgData) {
+                        parseSVGForExtrusion(lastSvgData, false, maxInteractiveQuality);
+                    }
                 }
             });
         }
         
-        // REMOVED: Color controls for extrusion - no longer in HTML
-        
-        // Extrusion position controls
+        // Extrusion position controls - FIX POSITIONING ISSUES
         const extrusionXEl = document.getElementById('extrusionX');
         const extrusionYEl = document.getElementById('extrusionY');
         const extrusionZEl = document.getElementById('extrusionZ');
         
+        // Set initial values from globals, NOT hardcoded values
         if (extrusionXEl) extrusionXEl.value = extrusionPosition.x;
-        if (extrusionYEl) extrusionYEl.value = 0.6; // Always set Y input to 0.6
+        if (extrusionYEl) extrusionYEl.value = extrusionPosition.y; // Use actual Y value, not hardcoded
         if (extrusionZEl) extrusionZEl.value = extrusionPosition.z;
         
         if (extrusionXEl) extrusionXEl.addEventListener('change', updateExtrusionPosition);
@@ -359,36 +400,79 @@ function updateTriangleColor() {
     }
 }
 
-// Update extrusion position (for 'change' events)
+// Set extrusion position from GUI values
 function updateExtrusionPosition() {
-    extrusionPosition.x = parseFloat(document.getElementById('extrusionX').value);
-    extrusionPosition.y = parseFloat(document.getElementById('extrusionY').value); // Use user's Y value
-    extrusionPosition.z = parseFloat(document.getElementById('extrusionZ').value);
+    // Get values from inputs
+    const xValue = parseFloat(document.getElementById('extrusionX').value);
+    const yValue = parseFloat(document.getElementById('extrusionY').value);
+    const zValue = parseFloat(document.getElementById('extrusionZ').value);
     
-    // Update the extrusion position in the scene
-    if (extrudedGroup) {
-        extrudedGroup.position.copy(extrusionPosition);
+    // Only update if values are valid numbers
+    if (!isNaN(xValue)) extrusionPosition.x = xValue;
+    if (!isNaN(yValue)) extrusionPosition.y = yValue; // RESPECT USER'S Y VALUE
+    if (!isNaN(zValue)) extrusionPosition.z = zValue;
+    
+    console.log(`Position updated to: (${extrusionPosition.x}, ${extrusionPosition.y}, ${extrusionPosition.z})`);
+    
+    // Update the scene without forcing rebuild
+    if (extrudedGroup && extrudedGroup.children.length > 0) {
+        extrudedGroup.children.forEach(child => {
+            if (child.isMesh) {
+                child.position.set(
+                    extrusionPosition.x, 
+                    brickDimensions.height + extrusionPosition.y, 
+                    extrusionPosition.z
+                );
+            }
+        });
+        
+        // For significant changes, rebuild at higher quality
+        if (lastSvgData) {
+            parseSVGForExtrusion(lastSvgData, false, maxInteractiveQuality);
+        }
     }
 }
 
-// Optimized position update with debouncing (for 'input' events)
+// Optimized position update with debouncing (for 'input' events) - FIX Y VALUE OVERRIDE
 function optimizedPositionUpdate() {
-    extrusionPosition.x = parseFloat(document.getElementById('extrusionX').value);
-    extrusionPosition.y = parseFloat(document.getElementById('extrusionY').value); // Use user's Y value
-    extrusionPosition.z = parseFloat(document.getElementById('extrusionZ').value);
+    // Get values from inputs
+    const xValue = parseFloat(document.getElementById('extrusionX').value);
+    const yValue = parseFloat(document.getElementById('extrusionY').value);
+    const zValue = parseFloat(document.getElementById('extrusionZ').value);
     
+    // Update with validation
+    if (!isNaN(xValue)) extrusionPosition.x = xValue;
+    if (!isNaN(yValue)) extrusionPosition.y = yValue; // RESPECT USER'S Y VALUE
+    if (!isNaN(zValue)) extrusionPosition.z = zValue;
+    
+    // Apply updates with debouncing
     if (isUserInteracting) {
         pendingUpdate = true;
         debounce(() => {
-            // Update the position without rebuilding
             if (extrudedGroup) {
-                extrudedGroup.position.copy(extrusionPosition);
+                extrudedGroup.children.forEach(child => {
+                    if (child.isMesh) {
+                        child.position.set(
+                            extrusionPosition.x, 
+                            brickDimensions.height + extrusionPosition.y, 
+                            extrusionPosition.z
+                        );
+                    }
+                });
             }
         });
     } else {
         // Immediate update if not interacting
         if (extrudedGroup) {
-            extrudedGroup.position.copy(extrusionPosition);
+            extrudedGroup.children.forEach(child => {
+                if (child.isMesh) {
+                    child.position.set(
+                        extrusionPosition.x, 
+                        brickDimensions.height + extrusionPosition.y, 
+                        extrusionPosition.z
+                    );
+                }
+            });
         }
     }
 }

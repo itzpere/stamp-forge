@@ -132,6 +132,16 @@ function loadSVGFromGallery(path, name) {
             window.lastSvgData = svgData;
             window.currentSvgFilename = name.replace(/\.svg$/i, "");
             
+            // ADDED: Reset scale to default value when loading from gallery
+            const svgScaleEl = document.getElementById('svgScale');
+            if (svgScaleEl) {
+                // Use the default value from globals.js
+                svgScaleEl.value = 0.2;
+                // Also update the global variable
+                window.svgScaleFactor = 0.2;
+                console.log(`Reset scale to default (0.2) for new SVG from gallery`);
+            }
+            
             // Create image to load the SVG for the texture
             const img = new Image();
             img.onload = function() {
@@ -220,6 +230,7 @@ function loadSVGFromGallery(path, name) {
                 // CRITICAL FIX: Always force a complete rebuild when loading from gallery
                 if (typeof window.parseSVGForExtrusion === 'function') {
                     try {
+                        console.log(`Processing gallery SVG with scale factor: ${window.svgScaleFactor}`);
                         // Force complete rebuild with immediate (non-progressive) quality
                         window.parseSVGForExtrusion(svgData, false, 0.5);
                     } catch (error) {

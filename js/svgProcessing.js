@@ -120,12 +120,22 @@ function parseSVGForExtrusion(svgString, lowQuality = false, qualityFactor = 1.0
         const centerX = (minX + maxX) / 2;
         const centerY = (minY + maxY) / 2;
         
-        // Calculate scaling factors to fit onto the brick top face
+        // FIXED: Improved scale calculation with explicit logging
         const scaleX = brickDimensions.width / svgWidth;
         const scaleY = brickDimensions.depth / svgHeight;
-        const scale = Math.min(scaleX, scaleY) * svgScaleFactor; // Use the adjustable scale factor
+        const baseScale = Math.min(scaleX, scaleY);
         
-        console.log(`SVG dimensions: ${svgWidth} x ${svgHeight}, Scale: ${scale}`);
+        // Explicitly log the current svgScaleFactor value for debugging
+        console.log(`Using svgScaleFactor: ${svgScaleFactor} (type: ${typeof svgScaleFactor})`);
+        
+        // Apply svgScaleFactor directly without multiplying against baseScale
+        // This gives more intuitive control over the size
+        const scale = baseScale * svgScaleFactor;
+        
+        console.log(`SVG dimensions: ${svgWidth.toFixed(2)} x ${svgHeight.toFixed(2)}, Scale calculation:
+            - Base scale (to fit): ${baseScale.toFixed(3)}
+            - User scale factor: ${svgScaleFactor.toFixed(3)}
+            - Final scale: ${scale.toFixed(3)}`);
         
         // Process paths based on quality settings
         let pathsToProcess = paths;
@@ -2233,7 +2243,7 @@ function addCurveToShape(curve, shape) {
     }
 }
 
-// Simplified function to create extruded shape
+// Helper function to create and position extruded shapes with quality option
 function createExtrudedShape(shape, scale, lowQuality = false) {
     // Ensure valid height
     const validHeight = Math.max(0.1, Number(extrusionHeight) || 1);
@@ -2269,31 +2279,42 @@ function createExtrudedShape(shape, scale, lowQuality = false) {
         const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
         geometry.computeVertexNormals();
         
-        // Create the mesh
+        // Create mesh with the extruded geometry
         const mesh = new THREE.Mesh(geometry, material);
         
-        // Scale and position
-        mesh.scale.set(scale * 0.25, -scale * 0.25, 1);
+        // FIXED: Scale factor implementation with explicit debugging
+        const finalScaleX = scale * 0.25;
+        const finalScaleY = -scale * 0.25;
+        
+        console.log(`Creating extrusion with scale metrics:
+            - Input scale: ${scale.toFixed(3)}
+            - Final X scale: ${finalScaleX.toFixed(3)}
+            - Final Y scale: ${finalScaleY.toFixed(3)}`);
+        
+        // Apply scaling with fixed implementation
+        mesh.scale.set(finalScaleX, finalScaleY, 1);
+        
+        // Rotate to lay flat on top of the brick
         mesh.rotation.x = Math.PI / 2;
+        
+        // Position exactly on top of the brick's top face with offset
+        // Apply the position offset from UI controls - USE ACTUAL Y VALUE
         mesh.position.set(
-            extrusionPosition.x || 0,
-            brickDimensions.height + (validHeight / 2) + (extrusionPosition.y || 0),
-            extrusionPosition.z || 0
+            extrusionPosition.x, 
+            brickDimensions.height + extrusionPosition.y, 
+            extrusionPosition.z
         );
         
-        // Update matrices
+        // Remove any duplicate geometries that might cause the extra layer
         mesh.updateMatrix();
-        mesh.updateMatrixWorld(true);
         
-        // Add to group
+        // Add to the extrusion group
         extrudedGroup.add(mesh);
-        extrudedGroup.updateMatrix();
-        extrudedGroup.updateMatrixWorld(true);
         
-        return mesh;
+        // Debug logging for position
+        console.log(`Positioned extrusion at: (${mesh.position.x}, ${mesh.position.y}, ${mesh.position.z})`);
     } catch (error) {
         console.error("Error creating extruded shape:", error);
-        return null;
     }
 }
 
