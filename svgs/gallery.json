@@ -2,108 +2,224 @@
   "images": [
     {
       "name": "alien-svgrepo-com.svg",
-      "path": "svgs/alien-svgrepo-com.svg"
+      "path": "svgs/alien-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "angel-wings-heart-svgrepo-com.svg",
+      "path": "svgs/angel-wings-heart-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "arcane-mask-svgrepo-com.svg",
+      "path": "svgs/arcane-mask-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "axe-left-svgrepo-com.svg",
+      "path": "svgs/axe-left-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "axe-svgrepo-com.svg",
+      "path": "svgs/axe-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "badge-check-svgrepo-com.svg",
-      "path": "svgs/badge-check-svgrepo-com.svg"
+      "path": "svgs/badge-check-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "basketball-svgrepo-com.svg",
-      "path": "svgs/basketball-svgrepo-com.svg"
+      "path": "svgs/basketball-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "battery-charge-svgrepo-com.svg",
-      "path": "svgs/battery-charge-svgrepo-com.svg"
+      "path": "svgs/battery-charge-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "bird-love-heart-svgrepo-com.svg",
+      "path": "svgs/bird-love-heart-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "bonfire-3-svgrepo-com.svg",
+      "path": "svgs/bonfire-3-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "bridge-svgrepo-com.svg",
-      "path": "svgs/bridge-svgrepo-com.svg"
+      "path": "svgs/bridge-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "camera-photo-heart-svgrepo-com.svg",
+      "path": "svgs/camera-photo-heart-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "cat-svgrepo-com.svg",
-      "path": "svgs/cat-svgrepo-com.svg"
+      "path": "svgs/cat-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "chair-svgrepo-com.svg",
-      "path": "svgs/chair-svgrepo-com.svg"
+      "path": "svgs/chair-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "checkmark-svgrepo-com(1).svg",
-      "path": "svgs/checkmark-svgrepo-com(1).svg"
+      "path": "svgs/checkmark-svgrepo-com(1).svg",
+      "thumbnail": null
     },
     {
       "name": "circle-arrow-down-svgrepo-com.svg",
-      "path": "svgs/circle-arrow-down-svgrepo-com.svg"
+      "path": "svgs/circle-arrow-down-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "circle-checkmark-svgrepo-com.svg",
-      "path": "svgs/circle-checkmark-svgrepo-com.svg"
+      "path": "svgs/circle-checkmark-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "coffee-cups-tea-svgrepo-com.svg",
+      "path": "svgs/coffee-cups-tea-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "dna-svgrepo-com.svg",
-      "path": "svgs/dna-svgrepo-com.svg"
+      "path": "svgs/dna-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "dollar-svgrepo-com.svg",
-      "path": "svgs/dollar-svgrepo-com.svg"
+      "path": "svgs/dollar-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "earth-11-svgrepo-com.svg",
+      "path": "svgs/earth-11-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "euro-svgrepo-com.svg",
-      "path": "svgs/euro-svgrepo-com.svg"
+      "path": "svgs/euro-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "face-meh-svgrepo-com.svg",
-      "path": "svgs/face-meh-svgrepo-com.svg"
+      "path": "svgs/face-meh-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "game-controller-svgrepo-com.svg",
-      "path": "svgs/game-controller-svgrepo-com.svg"
+      "path": "svgs/game-controller-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "gem-svgrepo-com.svg",
-      "path": "svgs/gem-svgrepo-com.svg"
+      "path": "svgs/gem-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "love-gesture-hand-svgrepo-com.svg",
+      "path": "svgs/love-gesture-hand-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "mail-15-svgrepo-com.svg",
+      "path": "svgs/mail-15-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "note-8-svgrepo-com.svg",
+      "path": "svgs/note-8-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "number-1-svgrepo-com.svg",
-      "path": "svgs/number-1-svgrepo-com.svg"
+      "path": "svgs/number-1-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "number-3-svgrepo-com.svg",
-      "path": "svgs/number-3-svgrepo-com.svg"
+      "path": "svgs/number-3-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "number-8-alt-svgrepo-com.svg",
-      "path": "svgs/number-8-alt-svgrepo-com.svg"
+      "path": "svgs/number-8-alt-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "outlet-svgrepo-com.svg",
-      "path": "svgs/outlet-svgrepo-com.svg"
+      "path": "svgs/outlet-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "owl(1).svg",
-      "path": "svgs/owl(1).svg"
+      "path": "svgs/owl(1).svg",
+      "thumbnail": null
     },
     {
       "name": "person-svgrepo-com.svg",
-      "path": "svgs/person-svgrepo-com.svg"
+      "path": "svgs/person-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "plus-svgrepo-com.svg",
-      "path": "svgs/plus-svgrepo-com.svg"
+      "path": "svgs/plus-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "power-svgrepo-com.svg",
-      "path": "svgs/power-svgrepo-com.svg"
+      "path": "svgs/power-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "rocket-svgrepo-com.svg",
+      "path": "svgs/rocket-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "rook-svgrepo-com.svg",
-      "path": "svgs/rook-svgrepo-com.svg"
+      "path": "svgs/rook-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "skeleton-16-svgrepo-com.svg",
+      "path": "svgs/skeleton-16-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "skeleton-17-svgrepo-com.svg",
+      "path": "svgs/skeleton-17-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "swan-love-heart-svgrepo-com.svg",
+      "path": "svgs/swan-love-heart-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "tool-svgrepo-com.svg",
+      "path": "svgs/tool-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "wine-cheers-heart-svgrepo-com.svg",
+      "path": "svgs/wine-cheers-heart-svgrepo-com.svg",
+      "thumbnail": null
     },
     {
       "name": "x-1-svgrepo-com.svg",
-      "path": "svgs/x-1-svgrepo-com.svg"
+      "path": "svgs/x-1-svgrepo-com.svg",
+      "thumbnail": null
     }
   ],
-  "lastUpdated": "2025-05-04T19:16:01.537Z"
+  "lastUpdated": "2025-05-05T17:26:34.163Z"
 }

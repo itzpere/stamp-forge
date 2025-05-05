@@ -74,7 +74,7 @@ function parseSVGForExtrusion(svgString, lowQuality = false, qualityFactor = 1.0
         
         console.log("Parsing SVG data with SVGLoader...");
         
-        // Parse the SVG string (fix variable naming conflict)
+        // Parse the SVG string
         const svgParsed = loader.parse(svgString);
         
         // Get paths from the SVG
@@ -91,42 +91,25 @@ function parseSVGForExtrusion(svgString, lowQuality = false, qualityFactor = 1.0
         
         // Calculate the bounding box to center and scale properly
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        let allPoints = [];
         
+        // First pass: collect all points for bounding box calculation
         paths.forEach(path => {
-            // Log path properties for debugging
             console.log(`Path with ${path.subPaths.length} subpaths`);
             
             path.subPaths.forEach(subPath => {
-                console.log(`  SubPath with ${subPath.curves.length} curves, closed: ${subPath.closed}`);
-            });
-            
-            const points = path.subPaths.flatMap(subPath => {
-                // Use the actual curves to get points instead of getPoints() which might be undefined
-                const subPathPoints = [];
-                let currentPoint = subPath.currentPoint;
-                subPath.curves.forEach(curve => {
-                    // Sample points along the curve
-                    const divisions = 10; // Adjust as needed for accuracy
-                    for (let i = 0; i <= divisions; i++) {
-                        const t = i / divisions;
-                        const point = curve.getPoint(t);
-                        subPathPoints.push(point);
-                    }
+                // Sample points along each curve in the subpath
+                const points = samplePointsFromSubPath(subPath);
+                allPoints = allPoints.concat(points);
+                
+                // Update bounding box
+                points.forEach(point => {
+                    if (!point) return;
+                    minX = Math.min(minX, point.x);
+                    minY = Math.min(minY, point.y);
+                    maxX = Math.max(maxX, point.x);
+                    maxY = Math.max(maxY, point.y);
                 });
-                return subPathPoints;
-            });
-            
-            if (points.length === 0) {
-                console.warn("No points extracted from path");
-                return;
-            }
-            
-            points.forEach(point => {
-                if (!point) return;
-                minX = Math.min(minX, point.x);
-                minY = Math.min(minY, point.y);
-                maxX = Math.max(maxX, point.x);
-                maxY = Math.max(maxY, point.y);
             });
         });
         
@@ -154,11 +137,11 @@ function parseSVGForExtrusion(svgString, lowQuality = false, qualityFactor = 1.0
             console.log(`Low quality mode: Processing ${limit} of ${paths.length} paths`);
         }
         
-        // Process synchronously for export or with progressive rendering for interactive use
+        // Use new simplified processing approach
         if (isExporting) {
-            processPathsSync(pathsToProcess, { centerX, centerY, scale, lowQuality, isExporting });
+            processPathsDirectly(pathsToProcess, { centerX, centerY, scale, lowQuality, isExporting });
         } else {
-            processPathsAsync(pathsToProcess, { centerX, centerY, scale, lowQuality, isExporting });
+            processPathsDirectlyAsync(pathsToProcess, { centerX, centerY, scale, lowQuality, isExporting });
         }
         
     } catch (error) {
@@ -170,167 +153,158 @@ function parseSVGForExtrusion(svgString, lowQuality = false, qualityFactor = 1.0
     }
 }
 
-// Process SVG paths synchronously (for export)
-function processPathsSync(paths, options) {
+// Function to sample points from a subpath (handles all curve types)
+function samplePointsFromSubPath(subPath, divisions = 10) {
+    const points = [];
+    
+    if (!subPath || !subPath.curves) return points;
+    
+    // Sample points along each curve
+    subPath.curves.forEach(curve => {
+        // Use getPoints for consistent sampling across all curve types
+        try {
+            const curvePoints = curve.getPoints(divisions);
+            points.push(...curvePoints);
+        } catch (error) {
+            console.warn("Error sampling points from curve:", error);
+            // Fallback for curves that don't support getPoints
+            if (curve.v1 && curve.v2) {
+                points.push(curve.v1, curve.v2);
+            } else if (curve.v0 && curve.v1) {
+                points.push(curve.v0, curve.v1);
+            }
+        }
+    });
+    
+    return points;
+}
+
+// New simplified processing approach that directly extrudes each path
+function processPathsDirectly(paths, options) {
     const { centerX, centerY, scale, lowQuality, isExporting } = options;
     const totalPaths = paths.length;
     
-    console.log(`Processing ${totalPaths} paths synchronously with enhanced hole detection`);
+    console.log(`Processing ${totalPaths} paths directly using simplified approach`);
     
-    // First pass: Collect all shapes and their areas to determine which are holes
+    // First collect all shapes with their metadata
     const allShapes = [];
     
+    // First pass: create all shapes and gather metadata
     for (let i = 0; i < totalPaths; i++) {
         const path = paths[i];
-        
         console.log(`Processing path ${i+1}/${totalPaths} with ${path.subPaths.length} subpaths`);
         
-        // Process each subpath in the path
+        // Process each subpath
         path.subPaths.forEach((subPath, subPathIndex) => {
-            console.log(`  Processing subpath ${subPathIndex}`);
-            
             try {
-                // Create shape directly from subPath curves instead of toShapes
-                const shape = createShapeFromCurves(subPath.curves);
-                
-                if (!shape) {
-                    console.warn(`  Failed to create shape from subpath ${subPathIndex}`);
-                    return;
-                }
+                // Create a shape from the subpath
+                const shape = createShapeFromSubPath(subPath);
+                if (!shape) return;
                 
                 // Center and scale the shape
-                const points = shape.getPoints();
+                const points = shape.getPoints(36);
                 points.forEach(point => {
                     point.x = (point.x - centerX) * scale;
                     point.y = (point.y - centerY) * scale;
                 });
                 
-                // Calculate shape area - negative area means clockwise winding (typically a hole)
+                // Calculate area to determine winding direction
                 const area = calculateShapeArea(shape);
-                const isClockwise = area < 0;
                 
-                // Store shape with its area for processing in the second pass
+                // Store shape with metadata
                 allShapes.push({
-                    shape,
+                    shape: shape,
                     area: Math.abs(area),
-                    isHole: isClockwise, // SVG standard: clockwise is usually a hole
+                    isClockwise: area < 0,  // In SVG, clockwise paths are typically holes
                     pathIndex: i,
-                    subPathIndex
+                    subPathIndex: subPathIndex,
+                    processed: false
                 });
                 
-                console.log(`  Created shape with ${points.length} points, area: ${area}, isHole: ${isClockwise}`);
-            } catch (shapeError) {
-                console.error(`  Error creating shape from subpath ${subPathIndex}:`, shapeError);
+                console.log(`Created shape ${allShapes.length-1} with area ${area.toFixed(2)}, isClockwise: ${area < 0}`);
+                
+            } catch (error) {
+                console.error(`Error processing subpath ${subPathIndex}:`, error);
             }
         });
-        
-        // Update progress for exports
-        if (isExporting && exportSettings.progressCallback) {
-            const progress = Math.round((i + 1) / totalPaths * 25);
-            exportSettings.progressCallback(progress);
-        }
     }
     
-    // Second pass: Sort shapes by area, largest first (outer shapes tend to be larger)
+    // Sort shapes by area, largest first (outer shapes tend to be larger)
     allShapes.sort((a, b) => b.area - a.area);
     
-    // Process outer shapes and detect which smaller shapes are holes in them
-    const processedIndices = new Set();
-    let shapeCount = 0;
+    // Second pass: identify outer shapes and their holes
+    let processedCount = 0;
     
-    // Process large shapes first, considering them as potential outer shapes
+    // Process large shapes first as potential outer shapes
     for (let i = 0; i < allShapes.length; i++) {
-        if (processedIndices.has(i)) continue;
+        if (allShapes[i].processed) continue;
         
         const outerShape = allShapes[i];
-        processedIndices.add(i);
+        outerShape.processed = true;
         
-        // Explicit holes are skipped as independent shapes and will be processed as holes for their parent shapes
-        if (outerShape.isHole) {
-            console.log(`Skipping explicit hole shape ${outerShape.pathIndex}.${outerShape.subPathIndex} for independent processing`);
+        // Skip small clockwise shapes as they're likely holes without a parent
+        if (outerShape.isClockwise && i > 0 && outerShape.area < allShapes[0].area * 0.5) {
+            console.log(`Skipping likely hole shape #${i}`);
             continue;
         }
         
-        // Create a new shape to work with (clone the shape to avoid modifying the original)
-        const newShape = new THREE.Shape();
-        outerShape.shape.getPoints().forEach((point, idx) => {
-            if (idx === 0) newShape.moveTo(point.x, point.y);
-            else newShape.lineTo(point.x, point.y);
+        // Create a new shape for extrusion
+        const mainShape = new THREE.Shape();
+        
+        // Copy points from the outer shape
+        const mainPoints = outerShape.shape.getPoints(36);
+        mainPoints.forEach((point, idx) => {
+            if (idx === 0) mainShape.moveTo(point.x, point.y);
+            else mainShape.lineTo(point.x, point.y);
         });
         
-        // Look for potential holes in this shape
-        const potentialHoles = [];
+        // Find holes for this shape
+        let holesAdded = 0;
         
         for (let j = 0; j < allShapes.length; j++) {
-            if (i === j || processedIndices.has(j)) continue;
+            if (i === j || allShapes[j].processed) continue;
             
-            const innerShape = allShapes[j];
+            const potentialHole = allShapes[j];
             
-            // Skip shapes that are larger than our potential outer shape
-            if (innerShape.area >= outerShape.area) continue;
+            // Holes should typically be:
+            // 1. Smaller than the container
+            // 2. Have opposite winding direction (in most SVGs)
+            // 3. Be contained within the outer shape
             
-            // Check if the inner shape is contained within the outer shape
-            if (isShapeContainedIn(innerShape.shape, outerShape.shape)) {
-                potentialHoles.push(j);
-                processedIndices.add(j);
+            if (potentialHole.area >= outerShape.area * 0.9) continue; // Too large to be a hole
+            
+            if (isShapeContainedIn(potentialHole.shape, outerShape.shape)) {
+                console.log(`Found hole: shape #${j} inside shape #${i}`);
+                potentialHole.processed = true;
                 
-                // Create a hole path and add it to the outer shape
+                // Add as a hole
                 const holePath = new THREE.Path();
-                const holePoints = innerShape.shape.getPoints(16); // Use more points for better precision
+                const holePoints = potentialHole.shape.getPoints(36);
                 
                 holePoints.forEach((point, idx) => {
                     if (idx === 0) holePath.moveTo(point.x, point.y);
                     else holePath.lineTo(point.x, point.y);
                 });
                 
-                // Ensure hole path is properly closed
-                const firstPoint = holePoints[0];
-                const lastPoint = holePoints[holePoints.length - 1];
-                
-                const distanceToStart = Math.sqrt(
-                    Math.pow(lastPoint.x - firstPoint.x, 2) + 
-                    Math.pow(lastPoint.y - firstPoint.y, 2)
-                );
-                
-                if (distanceToStart > 0.001) {
-                    holePath.lineTo(firstPoint.x, firstPoint.y);
-                }
-                
                 holePath.closePath();
-                newShape.holes.push(holePath);
-                
-                console.log(`Added hole ${innerShape.pathIndex}.${innerShape.subPathIndex} to shape ${outerShape.pathIndex}.${outerShape.subPathIndex}`);
+                mainShape.holes.push(holePath);
+                holesAdded++;
             }
         }
         
-        // Create the extruded 3D object for this shape with its holes
-        console.log(`Creating extruded shape with ${newShape.holes.length} holes`);
-        createExtrudedShapeOverride(newShape, scale, lowQuality);
-        shapeCount++;
+        // Create extrusion with any detected holes
+        console.log(`Extruding shape #${i} with ${holesAdded} holes`);
+        createExtrudedShape(mainShape, scale, lowQuality);
+        processedCount++;
         
         // Update progress for exports
-        if (isExporting && exportSettings.progressCallback) {
-            const progress = 25 + Math.round(shapeCount / allShapes.length * 25);
+        if (isExporting && exportSettings.progressCallback && (processedCount % 5 === 0)) {
+            const progress = Math.round(processedCount / allShapes.length * 100);
             exportSettings.progressCallback(progress);
         }
     }
     
-    // Process any remaining shapes that weren't holes or outer shapes
-    for (let i = 0; i < allShapes.length; i++) {
-        if (processedIndices.has(i)) continue;
-        
-        const shape = allShapes[i];
-        createExtrudedShapeOverride(shape.shape, scale, lowQuality);
-        shapeCount++;
-        
-        // Update progress for exports
-        if (isExporting && exportSettings.progressCallback) {
-            const progress = 50 + Math.round(shapeCount / allShapes.length * 50);
-            exportSettings.progressCallback(progress);
-        }
-    }
-    
-    console.log(`Finished processing. Created ${extrudedGroup.children.length} extruded objects with proper holes.`);
+    console.log(`Created ${processedCount} extrusions with holes from ${allShapes.length} shapes`);
     
     // Hide loading indicator when done (if not exporting)
     if (!isExporting) {
@@ -338,180 +312,413 @@ function processPathsSync(paths, options) {
     }
 }
 
-// Function to simplify a shape by removing points that are too close together
-function simplifyShape(shape, minDistance = 0.01) {
-    // Create a new shape with simplified points
-    const newShape = new THREE.Shape();
-    const points = shape.getPoints(32); // Use more points for higher precision
+// Calculate the area of a shape to determine winding direction
+function calculateShapeArea(shape) {
+    const points = shape.getPoints(36);
+    let area = 0;
     
-    if (points.length < 3) return shape; // Can't simplify shapes with less than 3 points
+    // Use shoelace formula to calculate signed area
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+        area += (points[j].x + points[i].x) * (points[j].y - points[i].y);
+    }
     
-    let lastPoint = points[0];
-    newShape.moveTo(lastPoint.x, lastPoint.y);
+    return area / 2;
+}
+
+// Check if one shape is contained within another
+function isShapeContainedIn(innerShape, outerShape) {
+    const innerPoints = innerShape.getPoints(24);
+    const outerPoints = outerShape.getPoints(36);
     
-    for (let i = 1; i < points.length; i++) {
-        const point = points[i];
-        const distance = Math.sqrt(
-            Math.pow(point.x - lastPoint.x, 2) + 
-            Math.pow(point.y - lastPoint.y, 2)
-        );
-        
-        if (distance >= minDistance) {
-            newShape.lineTo(point.x, point.y);
-            lastPoint = point;
+    // For a shape to be considered inside another, most of its points should be inside
+    let pointsInside = 0;
+    const threshold = 0.7; // 70% of points must be inside
+    
+    for (const point of innerPoints) {
+        if (isPointInPolygon(point, outerPoints)) {
+            pointsInside++;
         }
     }
     
-    // Close the shape
-    newShape.closePath();
+    return pointsInside / innerPoints.length >= threshold;
+}
+
+// Check if a point is inside a polygon using ray casting algorithm
+function isPointInPolygon(point, polygon) {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i].x, yi = polygon[i].y;
+        const xj = polygon[j].x, yj = polygon[j].y;
+        
+        const intersect = ((yi > point.y) !== (yj > point.y)) &&
+            (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+            
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
+// Update the async version to use the same hole detection logic
+function processPathsDirectlyAsync(paths, options) {
+    const { centerX, centerY, scale, lowQuality } = options;
+    const batchSize = 5;
     
-    // Add any holes with improved simplification
-    if (shape.holes && shape.holes.length > 0) {
-        shape.holes.forEach(hole => {
-            const newHole = new THREE.Path();
-            const holePoints = hole.getPoints(32); // Use more points for higher precision
+    // First collect all shapes with their metadata (same as in the sync version)
+    const allShapes = [];
+    let currentPathIndex = 0;
+    const totalPaths = paths.length;
+    
+    console.log(`Processing ${totalPaths} paths asynchronously with hole detection`);
+    
+    // Phase 1: Collect all shapes
+    function collectShapes() {
+        const startTime = performance.now();
+        let processedInBatch = 0;
+        
+        while (processedInBatch < batchSize && currentPathIndex < totalPaths) {
+            const path = paths[currentPathIndex];
             
-            if (holePoints.length < 3) return; // Skip holes with less than 3 points
+            // Process each subpath
+            path.subPaths.forEach((subPath, subPathIndex) => {
+                try {
+                    // Create a shape from the subpath
+                    const shape = createShapeFromSubPath(subPath);
+                    if (!shape) return;
+                    
+                    // Center and scale the shape
+                    const points = shape.getPoints(24);
+                    points.forEach(point => {
+                        point.x = (point.x - centerX) * scale;
+                        point.y = (point.y - centerY) * scale;
+                    });
+                    
+                    // Calculate area to determine winding direction
+                    const area = calculateShapeArea(shape);
+                    
+                    // Store shape with metadata
+                    allShapes.push({
+                        shape: shape,
+                        area: Math.abs(area),
+                        isClockwise: area < 0,
+                        pathIndex: currentPathIndex,
+                        subPathIndex: subPathIndex,
+                        processed: false
+                    });
+                    
+                } catch (error) {
+                    console.error(`Error processing async subpath ${subPathIndex}:`, error);
+                }
+            });
             
-            lastPoint = holePoints[0];
-            newHole.moveTo(lastPoint.x, lastPoint.y);
+            currentPathIndex++;
+            processedInBatch++;
             
-            for (let i = 1; i < holePoints.length; i++) {
-                const point = holePoints[i];
-                const distance = Math.sqrt(
-                    Math.pow(point.x - lastPoint.x, 2) + 
-                    Math.pow(point.y - lastPoint.y, 2)
-                );
+            if (performance.now() - startTime > 16) { // 16ms = ~60fps
+                break;
+            }
+        }
+        
+        // Update progress
+        const percentComplete = Math.round((currentPathIndex / totalPaths) * 100);
+        console.log(`Shape collection: ${currentPathIndex}/${totalPaths} paths (${percentComplete}%)`);
+        
+        // Continue collecting shapes or move to processing phase
+        if (currentPathIndex < totalPaths) {
+            setTimeout(collectShapes, 0);
+        } else {
+            console.log(`Collected ${allShapes.length} shapes, sorting by area and processing...`);
+            // Sort shapes by area, largest first (outer shapes tend to be larger)
+            allShapes.sort((a, b) => b.area - a.area);
+            setTimeout(processShapesWithHoles, 0);
+        }
+    }
+    
+    // Phase 2: Process shapes with hole detection
+    let processedShapeIndex = 0;
+    
+    function processShapesWithHoles() {
+        const startTime = performance.now();
+        let processedInBatch = 0;
+        
+        while (processedInBatch < Math.max(1, batchSize/2) && processedShapeIndex < allShapes.length) {
+            if (allShapes[processedShapeIndex].processed) {
+                processedShapeIndex++;
+                continue;
+            }
+            
+            const outerShape = allShapes[processedShapeIndex];
+            outerShape.processed = true;
+            
+            // Skip small clockwise shapes as they're likely holes without a parent
+            if (outerShape.isClockwise && processedShapeIndex > 0 && 
+                outerShape.area < allShapes[0].area * 0.5) {
+                console.log(`Skipping likely hole shape #${processedShapeIndex}`);
+                processedShapeIndex++;
+                continue;
+            }
+            
+            // Create a new shape for extrusion
+            const mainShape = new THREE.Shape();
+            
+            // Copy points from the outer shape
+            const mainPoints = outerShape.shape.getPoints(24);
+            mainPoints.forEach((point, idx) => {
+                if (idx === 0) mainShape.moveTo(point.x, point.y);
+                else mainShape.lineTo(point.x, point.y);
+            });
+            
+            // Find holes for this shape
+            let holesAdded = 0;
+            
+            for (let j = 0; j < allShapes.length; j++) {
+                if (processedShapeIndex === j || allShapes[j].processed) continue;
                 
-                if (distance >= minDistance) {
-                    newHole.lineTo(point.x, point.y);
-                    lastPoint = point;
+                const potentialHole = allShapes[j];
+                
+                if (potentialHole.area >= outerShape.area * 0.9) continue;
+                
+                if (isShapeContainedIn(potentialHole.shape, outerShape.shape)) {
+                    console.log(`Found hole: shape #${j} inside shape #${processedShapeIndex}`);
+                    potentialHole.processed = true;
+                    
+                    // Add as a hole
+                    const holePath = new THREE.Path();
+                    const holePoints = potentialHole.shape.getPoints(24);
+                    
+                    holePoints.forEach((point, idx) => {
+                        if (idx === 0) holePath.moveTo(point.x, point.y);
+                        else holePath.lineTo(point.x, point.y);
+                    });
+                    
+                    holePath.closePath();
+                    mainShape.holes.push(holePath);
+                    holesAdded++;
                 }
             }
             
-            // Ensure the hole is properly closed
-            const firstPoint = holePoints[0];
-            const distanceToStart = Math.sqrt(
-                Math.pow(lastPoint.x - firstPoint.x, 2) + 
-                Math.pow(lastPoint.y - firstPoint.y, 2)
-            );
+            // Create extrusion with any detected holes
+            console.log(`Extruding shape #${processedShapeIndex} with ${holesAdded} holes`);
+            createExtrudedShape(mainShape, scale, lowQuality);
             
-            if (distanceToStart > 0.001) {
-                newHole.lineTo(firstPoint.x, firstPoint.y);
+            processedShapeIndex++;
+            processedInBatch++;
+            
+            if (performance.now() - startTime > 16) {
+                break;
             }
-            
-            // Close the hole
-            newHole.closePath();
-            
-            // Only add the hole if it has at least 3 points after simplification
-            if (newHole.curves.length >= 3) {
-                newShape.holes.push(newHole);
-            }
-        });
+        }
+        
+        // Update progress
+        const percentComplete = Math.round((processedShapeIndex / allShapes.length) * 100);
+        console.log(`Shape processing: ${processedShapeIndex}/${allShapes.length} shapes (${percentComplete}%)`);
+        
+        // Continue processing or finish
+        if (processedShapeIndex < allShapes.length) {
+            setTimeout(processShapesWithHoles, 0);
+        } else {
+            console.log(`Async processing complete. Created ${extrudedGroup.children.length} extruded objects.`);
+            document.getElementById('loading').classList.add('hidden');
+        }
     }
     
-    return newShape;
+    // Start the first phase
+    collectShapes();
 }
 
-// Global counter to generate unique colors for each shape
-let shapeColorCounter = 0;
-
-// Function to generate a visually distinct color based on an index
-function generateDistinctColor(index) {
-    // Use golden ratio to get well-distributed colors
-    // This creates colors that are distinct from each other
-    const goldenRatioConjugate = 0.618033988749895;
-    const hue = (index * goldenRatioConjugate) % 1;
+// Improved function to create a shape from a subpath - handles both open and closed paths
+function createShapeFromSubPath(subPath) {
+    if (!subPath || !subPath.curves || subPath.curves.length === 0) {
+        return null;
+    }
     
-    // Convert HSL to RGB (saturation and lightness fixed for good visibility)
-    return new THREE.Color().setHSL(hue, 0.7, 0.55);
+    // Create a new shape
+    const shape = new THREE.Shape();
+    
+    // Determine starting point
+    let startPoint = getPointFromCurve(subPath.curves[0], 0);
+    if (!startPoint) {
+        console.warn("Could not find starting point for subpath");
+        return null;
+    }
+    
+    // Log whether the path is closed or open
+    console.log(`Processing ${subPath.closed ? 'closed' : 'open'} subpath with ${subPath.curves.length} curves`);
+    
+    // Start the shape
+    shape.moveTo(startPoint.x, startPoint.y);
+    
+    // Add all curves to the shape
+    subPath.curves.forEach(curve => {
+        addCurveToShape(curve, shape);
+    });
+    
+    // For open paths, we need to close them for proper extrusion
+    if (!subPath.closed) {
+        // Get the last point of the last curve
+        let lastCurve = subPath.curves[subPath.curves.length - 1];
+        let lastPoint = getPointFromCurve(lastCurve, 1);
+        
+        // If the distance between start and end is significant, connect them
+        if (lastPoint && startPoint) {
+            const distance = Math.sqrt(
+                Math.pow(lastPoint.x - startPoint.x, 2) + 
+                Math.pow(lastPoint.y - startPoint.y, 2)
+            );
+            
+            if (distance > 0.001) {
+                // For open paths, we have two options:
+                // 1. Connect the last point back to the first point
+                shape.lineTo(startPoint.x, startPoint.y);
+                console.log(`Closed open path by connecting end back to start (distance: ${distance})`);
+            }
+        }
+    }
+    
+    // Always ensure the shape is closed for extrusion
+    shape.closePath();
+    
+    return shape;
 }
 
-// Enhanced extrusion function with improved settings for solid objects with holes
-function createExtrudedShapeOverride(shape, scale, lowQuality = false) {
-    // Validate height - ensure it's a positive number
+// Helper function to get a point from a curve at t parameter (improved to handle more curve types)
+function getPointFromCurve(curve, t) {
+    if (!curve) return null;
+    
+    // Try to get point using getPoint method first
+    try {
+        return curve.getPoint(t);
+    } catch (e) {
+        // Fallback for different curve types based on t value
+        if (t === 0) {
+            // Return start point
+            if (curve.v0) return curve.v0;
+            if (curve.v1) return curve.v1;
+            if (curve.p0) return curve.p0;
+        } else if (t === 1) {
+            // Return end point
+            if (curve.v3) return curve.v3;
+            if (curve.v2) return curve.v2;
+            if (curve.p1) return curve.p1;
+        }
+        
+        // More fallbacks for other curve types
+        if (curve.points && curve.points.length > 0) {
+            const index = Math.min(Math.floor(t * curve.points.length), curve.points.length - 1);
+            return curve.points[index];
+        }
+        
+        return null;
+    }
+}
+
+// Helper function to add a curve to a shape (improved to handle more curve types)
+function addCurveToShape(curve, shape) {
+    if (!curve) return;
+    
+    try {
+        if (curve.isLineCurve) {
+            shape.lineTo(curve.v2.x, curve.v2.y);
+        } 
+        else if (curve.isQuadraticBezierCurve) {
+            shape.quadraticCurveTo(
+                curve.v1.x, curve.v1.y,
+                curve.v2.x, curve.v2.y
+            );
+        }
+        else if (curve.isCubicBezierCurve) {
+            shape.bezierCurveTo(
+                curve.v1.x, curve.v1.y,
+                curve.v2.x, curve.v2.y,
+                curve.v3.x, curve.v3.y
+            );
+        }
+        else if (curve.getPoints) {
+            // Use more points for better accuracy
+            const points = curve.getPoints(24);
+            points.forEach((point, i) => {
+                if (i > 0) shape.lineTo(point.x, point.y);
+            });
+        }
+        else if (curve.v2) {
+            // Fallback for simple line-like curves
+            shape.lineTo(curve.v2.x, curve.v2.y);
+        }
+        else if (curve.p1) {
+            // Fallback for point-based curves
+            shape.lineTo(curve.p1.x, curve.p1.y);
+        }
+        else {
+            console.warn("Unknown curve type, unable to add to shape");
+        }
+    } catch (e) {
+        console.warn("Error adding curve to shape:", e);
+        // Try to add end point as a fallback
+        try {
+            const endPoint = getPointFromCurve(curve, 1);
+            if (endPoint) {
+                shape.lineTo(endPoint.x, endPoint.y);
+                console.log("Used fallback point for curve");
+            }
+        } catch (fallbackError) {
+            console.error("Even fallback failed for curve", fallbackError);
+        }
+    }
+}
+
+// Simplified function to create extruded shape
+function createExtrudedShape(shape, scale, lowQuality = false) {
+    // Ensure valid height
     const validHeight = Math.max(0.1, Number(extrusionHeight) || 1);
     
-    // CRITICAL FIX: Log actual extrusion height being used
-    console.log(`Creating extrusion with height: ${validHeight}`);
+    // Simplify quality settings
+    const steps = isHighQualityMode ? 4 : (lowQuality ? 1 : 2);
     
-    // Higher quality settings for export
-    const steps = isHighQualityMode ? exportSettings.extrudeSteps : (lowQuality ? 1 : 3);
-    
-    // Use different extrude settings based on quality mode
+    // Use simplified extrude settings
     const extrudeSettings = {
         steps: steps,
-        depth: validHeight, // CRITICAL: Use validated height directly
-        bevelEnabled: !lowQuality, // Enable bevel for more solid appearance
+        depth: validHeight,
+        bevelEnabled: !lowQuality,
         bevelThickness: 0.05,
         bevelSize: 0.02,
         bevelSegments: isHighQualityMode ? 3 : 1,
-        curveSegments: isHighQualityMode ? 24 : (lowQuality ? 8 : 12), // Higher resolution for curves
-        UVGenerator: THREE.ExtrudeGeometry.WorldUVGenerator // Better UV mapping
+        curveSegments: isHighQualityMode ? 24 : (lowQuality ? 8 : 12)
     };
     
-    // Log the number of holes for debugging
-    if (shape.holes && shape.holes.length > 0) {
-        console.log(`Extruding shape with ${shape.holes.length} holes`);
-        shape.holes.forEach((hole, idx) => {
-            console.log(`  Hole ${idx} has ${hole.curves.length} curves`);
-        });
-    }
-    
-    // Generate a unique color for this shape
+    // Generate a unique color
     const uniqueColor = generateDistinctColor(shapeColorCounter++);
     
-    // Use optimized material settings for solid appearance with unique color
+    // Create material
     const material = new THREE.MeshStandardMaterial({
         color: uniqueColor,
         roughness: 0.5,
         metalness: 0.2,
-        flatShading: false, // Smooth shading for better appearance
-        side: THREE.DoubleSide, // Changed to DoubleSide to ensure all faces render properly
-        shadowSide: THREE.DoubleSide // Changed to DoubleSide for proper shadow casting
+        flatShading: false,
+        side: THREE.DoubleSide
     });
     
     try {
-        // Simplify shape slightly to avoid self-intersections (helps with hole rendering)
-        const simplifiedShape = simplifyShape(shape, 0.01);
-        
-        // Log shape information for debugging
-        console.log(`Creating extruded shape #${shapeColorCounter-1} with ${simplifiedShape.getPoints().length} points and ${simplifiedShape.holes ? simplifiedShape.holes.length : 0} holes`);
-        
-        // Create extruded geometry with explicit triangulation
-        // CRITICAL FIX: Create a new copy of the extrude settings to avoid reference issues
-        const geometry = new THREE.ExtrudeGeometry(simplifiedShape, {...extrudeSettings});
-        
-        // Ensure proper normals for better lighting and rendering
+        // Create the geometry
+        const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
         geometry.computeVertexNormals();
         
-        // Create mesh with the extruded geometry
+        // Create the mesh
         const mesh = new THREE.Mesh(geometry, material);
         
-        // Apply proper scaling - make sure scale matches what's seen in viewer
+        // Scale and position
         mesh.scale.set(scale * 0.25, -scale * 0.25, 1);
-        
-        // Rotate to lay flat on top of the brick
         mesh.rotation.x = Math.PI / 2;
-        
-        // VERY IMPORTANT: Position on top of the brick accurately - exactly matching what's in the UI
         mesh.position.set(
-            extrusionPosition.x || 0,  // X position from UI
-            brickDimensions.height + (extrusionHeight / 2) + (extrusionPosition.y || 0),  // Y position adjusted for new brick position
-            extrusionPosition.z || 0   // Z position from UI
+            extrusionPosition.x || 0,
+            brickDimensions.height + (validHeight / 2) + (extrusionPosition.y || 0),
+            extrusionPosition.z || 0
         );
         
-        // Log exact position and extrusion height for debugging
-        console.log(`Creating extrusion at position: [${mesh.position.x}, ${mesh.position.y}, ${mesh.position.z}] with height: ${validHeight}`);
-        
-        // Update matrices immediately
+        // Update matrices
         mesh.updateMatrix();
         mesh.updateMatrixWorld(true);
         
-        // Add to the extrusion group
+        // Add to group
         extrudedGroup.add(mesh);
-        
-        // Update parent group matrices
         extrudedGroup.updateMatrix();
         extrudedGroup.updateMatrixWorld(true);
         
@@ -522,316 +729,11 @@ function createExtrudedShapeOverride(shape, scale, lowQuality = false) {
     }
 }
 
-// Improved function to check if one shape is contained within another
-function isShapeContainedIn(innerShape, outerShape) {
-    // Get points from both shapes
-    const innerPoints = innerShape.getPoints(16); // Use more points for better precision
-    const outerPoints = outerShape.getPoints(16);
-    
-    // For a shape to be a hole, most of its points should be inside the outer shape
-    // We'll use a threshold to allow for some edge cases and numerical imprecision
-    const threshold = 0.9; // 90% of points must be inside to consider it a hole
-    
-    // Count how many points are inside
-    let pointsInside = 0;
-    for (const point of innerPoints) {
-        if (isPointInPolygon(point, outerPoints)) {
-            pointsInside++;
-        }
-    }
-    
-    // Calculate the percentage of points inside
-    const percentInside = pointsInside / innerPoints.length;
-    
-    // Additional area-based check for better reliability
-    const innerArea = Math.abs(calculateShapeArea(innerShape));
-    const outerArea = Math.abs(calculateShapeArea(outerShape));
-    
-    // A hole must be smaller than its container
-    if (innerArea >= outerArea) {
-        return false;
-    }
-    
-    console.log(`Shape containment test: ${percentInside * 100}% of points inside, innerArea=${innerArea}, outerArea=${outerArea}`);
-    
-    return percentInside >= threshold;
-}
-
-// Improved point-in-polygon test with complete implementation
-function isPointInPolygon(point, polygon) {
-    let inside = false;
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i].x, yi = polygon[i].y;
-        const xj = polygon[j].x, yj = polygon[j].y;
-        
-        const intersect = ((yi > point.y) !== (yj > point.y))
-            && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
-        if (intersect) inside = !inside;
-    }
-    return inside;
-}
-
-// Process SVG paths asynchronously (for interactive use)
-function processPathsAsync(paths, options) {
-    const { centerX, centerY, scale, lowQuality } = options;
-    const batchSize = 3; // Process fewer paths per frame for smoother experience
-    let currentPathIndex = 0;
-    const totalPaths = paths.length;
-    
-    console.log(`Processing ${totalPaths} paths asynchronously in batches of ${batchSize}`);
-    
-    function processBatch() {
-        const startTime = performance.now();
-        let processedInBatch = 0;
-        
-        console.log(`Processing batch starting at path ${currentPathIndex}/${totalPaths}`);
-        
-        // Process a small batch of paths
-        while (processedInBatch < batchSize && currentPathIndex < totalPaths) {
-            const path = paths[currentPathIndex];
-            
-            // For each path, collect all its subpaths
-            const pathShapes = [];
-            
-            // First pass: Create and collect all shapes for this path
-            path.subPaths.forEach((subPath, subPathIndex) => {
-                try {
-                    // Create shape directly from curves
-                    const shape = createShapeFromCurves(subPath.curves);
-                    
-                    if (!shape) {
-                        console.warn(`No shape created from path ${currentPathIndex}, subpath ${subPathIndex}`);
-                        return;
-                    }
-                    
-                    // Center and scale the shape
-                    const points = shape.getPoints();
-                    points.forEach(point => {
-                        point.x = (point.x - centerX) * scale;
-                        point.y = (point.y - centerY) * scale;
-                    });
-                    
-                    // Calculate area to determine winding direction
-                    const area = calculateShapeArea(shape);
-                    
-                    // Store the shape with its metadata
-                    pathShapes.push({
-                        shape: shape,
-                        area: Math.abs(area),
-                        isClockwise: area < 0, // Clockwise shapes typically represent holes
-                        subPathIndex: subPathIndex
-                    });
-                    
-                    console.log(`Created shape for subpath ${subPathIndex}, area: ${area}, isClockwise: ${area < 0}`);
-                    
-                } catch (shapeError) {
-                    console.error(`Error creating shape from path ${currentPathIndex}, subPath ${subPathIndex}:`, shapeError);
-                }
-            });
-            
-            // Second pass: Identify outer shapes and their holes
-            if (pathShapes.length > 0) {
-                // Sort shapes by area (largest first, likely to be outer shapes)
-                pathShapes.sort((a, b) => b.area - a.area);
-                
-                const processedIndices = new Set();
-                
-                // Process each shape starting with the largest
-                for (let i = 0; i < pathShapes.length; i++) {
-                    if (processedIndices.has(i)) continue;
-                    
-                    const outerShape = pathShapes[i];
-                    processedIndices.add(i);
-                    
-                    // If shape is likely a hole itself (small and clockwise), skip as independent shape
-                    if (outerShape.isClockwise && i > 0) {
-                        console.log(`Skipping likely hole shape at subpath ${outerShape.subPathIndex}`);
-                        continue;
-                    }
-                    
-                    // Create a new main shape (to avoid modifying the original)
-                    const mainShape = new THREE.Shape();
-                    const mainPoints = outerShape.shape.getPoints();
-                    
-                    mainPoints.forEach((point, idx) => {
-                        if (idx === 0) mainShape.moveTo(point.x, point.y);
-                        else mainShape.lineTo(point.x, point.y);
-                    });
-                    
-                    // Check remaining shapes to see if they are holes in this shape
-                    let holesFound = 0;
-                    
-                    for (let j = 0; j < pathShapes.length; j++) {
-                        if (i === j || processedIndices.has(j)) continue;
-                        
-                        const innerShape = pathShapes[j];
-                        
-                        // For a shape to be a hole:
-                        // 1. It should be smaller (have less area)
-                        // 2. Its points should be inside the outer shape
-                        // 3. Ideally it should have opposite winding direction
-                        
-                        if (innerShape.area >= outerShape.area) continue;
-                        
-                        if (isShapeContainedIn(innerShape.shape, outerShape.shape)) {
-                            console.log(`Found hole: subpath ${innerShape.subPathIndex} inside subpath ${outerShape.subPathIndex}`);
-                            processedIndices.add(j);
-                            
-                            // Add as a hole to the main shape
-                            const holePath = new THREE.Path();
-                            const holePoints = innerShape.shape.getPoints();
-                            
-                            holePoints.forEach((point, idx) => {
-                                if (idx === 0) holePath.moveTo(point.x, point.y);
-                                else holePath.lineTo(point.x, point.y);
-                            });
-                            
-                            // Ensure hole path is properly closed
-                            holePath.closePath();
-                            mainShape.holes.push(holePath);
-                            holesFound++;
-                        }
-                    }
-                    
-                    // Create the extruded object with holes
-                    console.log(`Extruding shape with ${holesFound} holes`);
-                    createExtrudedShapeOverride(mainShape, scale, lowQuality);
-                }
-                
-                // Process any remaining shapes that weren't identified as holes
-                for (let i = 0; i < pathShapes.length; i++) {
-                    if (processedIndices.has(i)) continue;
-                    
-                    console.log(`Extruding remaining shape at subpath ${pathShapes[i].subPathIndex}`);
-                    createExtrudedShapeOverride(pathShapes[i].shape, scale, lowQuality);
-                }
-            }
-            
-            currentPathIndex++;
-            processedInBatch++;
-            
-            // Check if we've been processing too long and should yield
-            if (performance.now() - startTime > 16) { // 16ms = ~60fps
-                break;
-            }
-        }
-        
-        console.log(`Batch processed. ${currentPathIndex}/${totalPaths} paths done.`);
-        
-        // If there's more to process, schedule the next batch
-        if (currentPathIndex < totalPaths) {
-            setTimeout(processBatch, 0);
-        } else {
-            // Hide loading indicator when done
-            console.log(`Async processing complete. Created ${extrudedGroup.children.length} extruded objects.`);
-            document.getElementById('loading').classList.add('hidden');
-        }
-    }
-    
-    // Start the first batch
-    processBatch();
-}
-
-// Helper function to calculate the area of a shape (used to determine winding direction)
-function calculateShapeArea(shape) {
-    const points = shape.getPoints();
-    let area = 0;
-    
-    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-        area += (points[j].x + points[i].x) * (points[j].y - points[i].y);
-    }
-    
-    return area / 2;
-}
-
-// New function to create a shape directly from curves without relying on toShapes
-function createShapeFromCurves(curves) {
-    if (!curves || curves.length === 0) {
-        console.warn("No curves provided to createShapeFromCurves");
-        return null;
-    }
-    
-    console.log(`Creating shape from ${curves.length} curves`);
-    
-    // Create a new THREE.Shape
-    const shape = new THREE.Shape();
-    
-    // We need to start at the first point of the first curve
-    let firstCurve = curves[0];
-    let startPoint;
-    
-    if (firstCurve.v0) {
-        startPoint = firstCurve.v0;
-    } else if (firstCurve.v1) {
-        startPoint = firstCurve.v1;
-    } else {
-        console.warn("Cannot find starting point in first curve");
-        return null;
-    }
-    
-    // Move to the starting point
-    shape.moveTo(startPoint.x, startPoint.y);
-    
-    // Add each curve to the shape
-    curves.forEach((curve) => {
-        if (curve.isLineCurve) {
-            // Line curves have v1 and v2 points
-            shape.lineTo(curve.v2.x, curve.v2.y);
-        } else if (curve.isQuadraticBezierCurve) {
-            // Quadratic curves have v1 (control point) and v2 (end point)
-            shape.quadraticCurveTo(
-                curve.v1.x, curve.v1.y,
-                curve.v2.x, curve.v2.y
-            );
-        } else if (curve.isCubicBezierCurve) {
-            // Cubic curves have v1, v2 (control points) and v3 (end point)
-            shape.bezierCurveTo(
-                curve.v1.x, curve.v1.y,
-                curve.v2.x, curve.v2.y,
-                curve.v3.x, curve.v3.y
-            );
-        } else if (curve.isEllipseCurve) {
-            // For ellipse curves we'd need to approximate with bezier curves
-            // This is a simplified version that uses points along the ellipse
-            const points = curve.getPoints(36); // Increased resolution for smoother curves
-            points.forEach(point => {
-                shape.lineTo(point.x, point.y);
-            });
-        } else if (curve.isSplineCurve) {
-            // Spline curves have points array
-            const points = curve.getPoints(36); // Increased resolution for smoother curves
-            points.forEach(point => {
-                shape.lineTo(point.x, point.y);
-            });
-        } else {
-            // For unknown curve types, sample points
-            const points = curve.getPoints(36); // Increased resolution for smoother curves
-            points.forEach(point => {
-                shape.lineTo(point.x, point.y);
-            });
-        }
-    });
-    
-    // Ensure the path is properly closed - this is critical for solid extrusions
-    const points = shape.getPoints();
-    if (points.length > 1) {
-        const lastPoint = points[points.length - 1];
-        const distanceToStart = Math.sqrt(
-            Math.pow(lastPoint.x - startPoint.x, 2) + 
-            Math.pow(lastPoint.y - startPoint.y, 2)
-        );
-        
-        // If the distance is small but not exactly zero, force close
-        if (distanceToStart > 0.001) {
-            console.log(`Forcing path closure. Distance to start: ${distanceToStart}`);
-            shape.lineTo(startPoint.x, startPoint.y);
-        }
-    }
-    
-    // Explicitly close the shape
-    shape.closePath();
-    
-    return shape;
+// Generate a distinct color for each shape
+function generateDistinctColor(index) {
+    const goldenRatioConjugate = 0.618033988749895;
+    const hue = (index * goldenRatioConjugate) % 1;
+    return new THREE.Color().setHSL(hue, 0.7, 0.55);
 }
 
 // Function to properly clean up previous SVG resources
@@ -1044,3 +946,6 @@ function handleSVGUpload(event) {
     
     reader.readAsText(file);
 }
+
+// Reset the counter whenever we load a new SVG
+shapeColorCounter = 0;
