@@ -242,9 +242,11 @@ function processPathsDirectly(paths, options) {
         const outerShape = allShapes[i];
         outerShape.processed = true;
         
-        // Skip small clockwise shapes as they're likely holes without a parent
-        if (outerShape.isClockwise && i > 0 && outerShape.area < allShapes[0].area * 0.5) {
-            console.log(`Skipping likely hole shape #${i}`);
+        // IMPROVED: More permissive hole detection (almost no auto-skipping)
+        // Only skip tiny shapes that are likely to be artifacts
+        if (outerShape.isClockwise && 
+            outerShape.area < allShapes[0].area * 0.01) { // Reduced from 0.1 to 0.01
+            console.log(`Skipping very small shape #${i} (area ratio: ${(outerShape.area/allShapes[0].area).toFixed(4)})`);
             continue;
         }
         
@@ -258,7 +260,7 @@ function processPathsDirectly(paths, options) {
             else mainShape.lineTo(point.x, point.y);
         });
         
-        // Find holes for this shape
+        // Find holes for this shape - improved hole detection logic
         let holesAdded = 0;
         
         for (let j = 0; j < allShapes.length; j++) {
@@ -266,15 +268,12 @@ function processPathsDirectly(paths, options) {
             
             const potentialHole = allShapes[j];
             
-            // Holes should typically be:
-            // 1. Smaller than the container
-            // 2. Have opposite winding direction (in most SVGs)
-            // 3. Be contained within the outer shape
+            // A hole should be substantially smaller
+            if (potentialHole.area >= outerShape.area * 0.9) continue;
             
-            if (potentialHole.area >= outerShape.area * 0.9) continue; // Too large to be a hole
-            
+            // Test if shape is contained inside - improved containment test
             if (isShapeContainedIn(potentialHole.shape, outerShape.shape)) {
-                console.log(`Found hole: shape #${j} inside shape #${i}`);
+                console.log(`Found hole: shape #${j} inside shape #${i} (area ratio: ${(potentialHole.area/outerShape.area).toFixed(3)})`);
                 potentialHole.processed = true;
                 
                 // Add as a hole
@@ -327,35 +326,1553 @@ function calculateShapeArea(shape) {
 
 // Check if one shape is contained within another
 function isShapeContainedIn(innerShape, outerShape) {
-    const innerPoints = innerShape.getPoints(24);
-    const outerPoints = outerShape.getPoints(36);
+    const innerPoints = innerShape.getPoints(36); // More sampling points for accuracy
+    const outerPoints = outerShape.getPoints(48);
+    
+    // First quick test: check bounding boxes
+    const innerBounds = getBoundingBox(innerPoints);
+    const outerBounds = getBoundingBox(outerPoints);
+    
+    // If inner bounding box extends beyond outer, it can't be contained
+    if (innerBounds.minX < outerBounds.minX || innerBounds.maxX > outerBounds.maxX ||
+        innerBounds.minY < outerBounds.minY || innerBounds.maxY > outerBounds.maxY) {
+        console.log("Bounding box test failed - shape not contained");
+        return false;
+    }
     
     // For a shape to be considered inside another, most of its points should be inside
     let pointsInside = 0;
-    const threshold = 0.7; // 70% of points must be inside
     
+    // Use adaptive threshold based on shape complexity
+    // Smaller shapes need higher percentage to avoid false positives
+    let threshold = 0.7; // Start with 70%
+    
+    // For shapes with few points, use higher threshold
+    if (innerPoints.length < 8) {
+        threshold = 0.85;
+    }
+    
+    // Check if most points are inside
     for (const point of innerPoints) {
         if (isPointInPolygon(point, outerPoints)) {
             pointsInside++;
         }
     }
     
-    return pointsInside / innerPoints.length >= threshold;
+    const percentInside = pointsInside / innerPoints.length;
+    
+    // Area-based checks
+    const innerArea = Math.abs(calculateShapeArea(innerShape));
+    const outerArea = Math.abs(calculateShapeArea(outerShape));
+    const areaRatio = innerArea / outerArea;
+    
+    // Log detailed containment info for debugging
+    console.log(`Containment test: ${(percentInside * 100).toFixed(1)}% inside, ratio=${areaRatio.toFixed(3)}, threshold=${threshold}`);
+    
+    // Three-part test for hole detection:
+    // 1. Most points must be inside the outer shape
+    // 2. The inner shape must be substantially smaller than the outer shape
+    // 3. For SVGs with many shapes, relax the area constraint
+    return (percentInside >= threshold) && (areaRatio < 0.9);
 }
 
-// Check if a point is inside a polygon using ray casting algorithm
-function isPointInPolygon(point, polygon) {
-    let inside = false;
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i].x, yi = polygon[i].y;
-        const xj = polygon[j].x, yj = polygon[j].y;
-        
-        const intersect = ((yi > point.y) !== (yj > point.y)) &&
-            (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
-            
-        if (intersect) inside = !inside;
+// Helper function to get bounding box of points
+function getBoundingBox(points) {
+    let minX = Infinity, minY = Infinity;
+    let maxX = -Infinity, maxY = -Infinity;
+    
+    for (const pt of points) {
+        minX = Math.min(minX, pt.x);
+        minY = Math.min(minY, pt.y);
+        maxX = Math.max(maxX, pt.x);
+        maxY = Math.max(maxY, pt.y);
     }
-    return inside;
+    
+    return { minX, minY, maxX, maxY };
+}
+
+// Update sync processing to use improved hole detection
+function processPathsDirectly(paths, options) {
+    const { centerX, centerY, scale, lowQuality, isExporting } = options;
+    const totalPaths = paths.length;
+    
+    console.log(`Processing ${totalPaths} paths directly using simplified approach`);
+    
+    // First collect all shapes with their metadata
+    const allShapes = [];
+    
+    // First pass: create all shapes and gather metadata
+    for (let i = 0; i < totalPaths; i++) {
+        const path = paths[i];
+        console.log(`Processing path ${i+1}/${totalPaths} with ${path.subPaths.length} subpaths`);
+        
+        // Process each subpath
+        path.subPaths.forEach((subPath, subPathIndex) => {
+            try {
+                // Create a shape from the subpath
+                const shape = createShapeFromSubPath(subPath);
+                if (!shape) return;
+                
+                // Center and scale the shape
+                const points = shape.getPoints(36);
+                points.forEach(point => {
+                    point.x = (point.x - centerX) * scale;
+                    point.y = (point.y - centerY) * scale;
+                });
+                
+                // Calculate area to determine winding direction
+                const area = calculateShapeArea(shape);
+                
+                // Store shape with metadata
+                allShapes.push({
+                    shape: shape,
+                    area: Math.abs(area),
+                    isClockwise: area < 0,  // In SVG, clockwise paths are typically holes
+                    pathIndex: i,
+                    subPathIndex: subPathIndex,
+                    processed: false
+                });
+                
+                console.log(`Created shape ${allShapes.length-1} with area ${area.toFixed(2)}, isClockwise: ${area < 0}`);
+                
+            } catch (error) {
+                console.error(`Error processing subpath ${subPathIndex}:`, error);
+            }
+        });
+    }
+    
+    // Sort shapes by area, largest first (outer shapes tend to be larger)
+    allShapes.sort((a, b) => b.area - a.area);
+    
+    // Second pass: identify outer shapes and their holes
+    let processedCount = 0;
+    
+    // Process large shapes first as potential outer shapes
+    for (let i = 0; i < allShapes.length; i++) {
+        if (allShapes[i].processed) continue;
+        
+        const outerShape = allShapes[i];
+        outerShape.processed = true;
+        
+        // IMPROVED: More permissive hole detection (almost no auto-skipping)
+        // Only skip tiny shapes that are likely to be artifacts
+        if (outerShape.isClockwise && 
+            outerShape.area < allShapes[0].area * 0.01) { // Reduced from 0.1 to 0.01
+            console.log(`Skipping very small shape #${i} (area ratio: ${(outerShape.area/allShapes[0].area).toFixed(4)})`);
+            continue;
+        }
+        
+        // Create a new shape for extrusion
+        const mainShape = new THREE.Shape();
+        
+        // Copy points from the outer shape
+        const mainPoints = outerShape.shape.getPoints(36);
+        mainPoints.forEach((point, idx) => {
+            if (idx === 0) mainShape.moveTo(point.x, point.y);
+            else mainShape.lineTo(point.x, point.y);
+        });
+        
+        // Find holes for this shape - improved hole detection logic
+        let holesAdded = 0;
+        
+        for (let j = 0; j < allShapes.length; j++) {
+            if (i === j || allShapes[j].processed) continue;
+            
+            const potentialHole = allShapes[j];
+            
+            // A hole should be substantially smaller
+            if (potentialHole.area >= outerShape.area * 0.9) continue;
+            
+            // Test if shape is contained inside - improved containment test
+            if (isShapeContainedIn(potentialHole.shape, outerShape.shape)) {
+                console.log(`Found hole: shape #${j} inside shape #${i} (area ratio: ${(potentialHole.area/outerShape.area).toFixed(3)})`);
+                potentialHole.processed = true;
+                
+                // Add as a hole
+                const holePath = new THREE.Path();
+                const holePoints = potentialHole.shape.getPoints(36);
+                
+                holePoints.forEach((point, idx) => {
+                    if (idx === 0) holePath.moveTo(point.x, point.y);
+                    else holePath.lineTo(point.x, point.y);
+                });
+                
+                holePath.closePath();
+                mainShape.holes.push(holePath);
+                holesAdded++;
+            }
+        }
+        
+        // Create extrusion with any detected holes
+        console.log(`Extruding shape #${i} with ${holesAdded} holes`);
+        createExtrudedShape(mainShape, scale, lowQuality);
+        processedCount++;
+        
+        // Update progress for exports
+        if (isExporting && exportSettings.progressCallback && (processedCount % 5 === 0)) {
+            const progress = Math.round(processedCount / allShapes.length * 100);
+            exportSettings.progressCallback(progress);
+        }
+    }
+    
+    console.log(`Created ${processedCount} extrusions with holes from ${allShapes.length} shapes`);
+    
+    // Hide loading indicator when done (if not exporting)
+    if (!isExporting) {
+        document.getElementById('loading').classList.add('hidden');
+    }
+}
+
+// Calculate the area of a shape to determine winding direction
+function calculateShapeArea(shape) {
+    const points = shape.getPoints(36);
+    let area = 0;
+    
+    // Use shoelace formula to calculate signed area
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+        area += (points[j].x + points[i].x) * (points[j].y - points[i].y);
+    }
+    
+    return area / 2;
+}
+
+// Check if one shape is contained within another
+function isShapeContainedIn(innerShape, outerShape) {
+    const innerPoints = innerShape.getPoints(36); // More sampling points for accuracy
+    const outerPoints = outerShape.getPoints(48);
+    
+    // First quick test: check bounding boxes
+    const innerBounds = getBoundingBox(innerPoints);
+    const outerBounds = getBoundingBox(outerPoints);
+    
+    // If inner bounding box extends beyond outer, it can't be contained
+    if (innerBounds.minX < outerBounds.minX || innerBounds.maxX > outerBounds.maxX ||
+        innerBounds.minY < outerBounds.minY || innerBounds.maxY > outerBounds.maxY) {
+        console.log("Bounding box test failed - shape not contained");
+        return false;
+    }
+    
+    // For a shape to be considered inside another, most of its points should be inside
+    let pointsInside = 0;
+    
+    // Use adaptive threshold based on shape complexity
+    // Smaller shapes need higher percentage to avoid false positives
+    let threshold = 0.7; // Start with 70%
+    
+    // For shapes with few points, use higher threshold
+    if (innerPoints.length < 8) {
+        threshold = 0.85;
+    }
+    
+    // Check if most points are inside
+    for (const point of innerPoints) {
+        if (isPointInPolygon(point, outerPoints)) {
+            pointsInside++;
+        }
+    }
+    
+    const percentInside = pointsInside / innerPoints.length;
+    
+    // Area-based checks
+    const innerArea = Math.abs(calculateShapeArea(innerShape));
+    const outerArea = Math.abs(calculateShapeArea(outerShape));
+    const areaRatio = innerArea / outerArea;
+    
+    // Log detailed containment info for debugging
+    console.log(`Containment test: ${(percentInside * 100).toFixed(1)}% inside, ratio=${areaRatio.toFixed(3)}, threshold=${threshold}`);
+    
+    // Three-part test for hole detection:
+    // 1. Most points must be inside the outer shape
+    // 2. The inner shape must be substantially smaller than the outer shape
+    // 3. For SVGs with many shapes, relax the area constraint
+    return (percentInside >= threshold) && (areaRatio < 0.9);
+}
+
+// Helper function to get bounding box of points
+function getBoundingBox(points) {
+    let minX = Infinity, minY = Infinity;
+    let maxX = -Infinity, maxY = -Infinity;
+    
+    for (const pt of points) {
+        minX = Math.min(minX, pt.x);
+        minY = Math.min(minY, pt.y);
+        maxX = Math.max(maxX, pt.x);
+        maxY = Math.max(maxY, pt.y);
+    }
+    
+    return { minX, minY, maxX, maxY };
+}
+
+// Update sync processing to use improved hole detection
+function processPathsDirectly(paths, options) {
+    const { centerX, centerY, scale, lowQuality, isExporting } = options;
+    const totalPaths = paths.length;
+    
+    console.log(`Processing ${totalPaths} paths directly using simplified approach`);
+    
+    // First collect all shapes with their metadata
+    const allShapes = [];
+    
+    // First pass: create all shapes and gather metadata
+    for (let i = 0; i < totalPaths; i++) {
+        const path = paths[i];
+        console.log(`Processing path ${i+1}/${totalPaths} with ${path.subPaths.length} subpaths`);
+        
+        // Process each subpath
+        path.subPaths.forEach((subPath, subPathIndex) => {
+            try {
+                // Create a shape from the subpath
+                const shape = createShapeFromSubPath(subPath);
+                if (!shape) return;
+                
+                // Center and scale the shape
+                const points = shape.getPoints(36);
+                points.forEach(point => {
+                    point.x = (point.x - centerX) * scale;
+                    point.y = (point.y - centerY) * scale;
+                });
+                
+                // Calculate area to determine winding direction
+                const area = calculateShapeArea(shape);
+                
+                // Store shape with metadata
+                allShapes.push({
+                    shape: shape,
+                    area: Math.abs(area),
+                    isClockwise: area < 0,  // In SVG, clockwise paths are typically holes
+                    pathIndex: i,
+                    subPathIndex: subPathIndex,
+                    processed: false
+                });
+                
+                console.log(`Created shape ${allShapes.length-1} with area ${area.toFixed(2)}, isClockwise: ${area < 0}`);
+                
+            } catch (error) {
+                console.error(`Error processing subpath ${subPathIndex}:`, error);
+            }
+        });
+    }
+    
+    // Sort shapes by area, largest first (outer shapes tend to be larger)
+    allShapes.sort((a, b) => b.area - a.area);
+    
+    // Second pass: identify outer shapes and their holes
+    let processedCount = 0;
+    
+    // Process large shapes first as potential outer shapes
+    for (let i = 0; i < allShapes.length; i++) {
+        if (allShapes[i].processed) continue;
+        
+        const outerShape = allShapes[i];
+        outerShape.processed = true;
+        
+        // IMPROVED: More permissive hole detection (almost no auto-skipping)
+        // Only skip tiny shapes that are likely to be artifacts
+        if (outerShape.isClockwise && 
+            outerShape.area < allShapes[0].area * 0.01) { // Reduced from 0.1 to 0.01
+            console.log(`Skipping very small shape #${i} (area ratio: ${(outerShape.area/allShapes[0].area).toFixed(4)})`);
+            continue;
+        }
+        
+        // Create a new shape for extrusion
+        const mainShape = new THREE.Shape();
+        
+        // Copy points from the outer shape
+        const mainPoints = outerShape.shape.getPoints(36);
+        mainPoints.forEach((point, idx) => {
+            if (idx === 0) mainShape.moveTo(point.x, point.y);
+            else mainShape.lineTo(point.x, point.y);
+        });
+        
+        // Find holes for this shape - improved hole detection logic
+        let holesAdded = 0;
+        
+        for (let j = 0; j < allShapes.length; j++) {
+            if (i === j || allShapes[j].processed) continue;
+            
+            const potentialHole = allShapes[j];
+            
+            // A hole should be substantially smaller
+            if (potentialHole.area >= outerShape.area * 0.9) continue;
+            
+            // Test if shape is contained inside - improved containment test
+            if (isShapeContainedIn(potentialHole.shape, outerShape.shape)) {
+                console.log(`Found hole: shape #${j} inside shape #${i} (area ratio: ${(potentialHole.area/outerShape.area).toFixed(3)})`);
+                potentialHole.processed = true;
+                
+                // Add as a hole
+                const holePath = new THREE.Path();
+                const holePoints = potentialHole.shape.getPoints(36);
+                
+                holePoints.forEach((point, idx) => {
+                    if (idx === 0) holePath.moveTo(point.x, point.y);
+                    else holePath.lineTo(point.x, point.y);
+                });
+                
+                holePath.closePath();
+                mainShape.holes.push(holePath);
+                holesAdded++;
+            }
+        }
+        
+        // Create extrusion with any detected holes
+        console.log(`Extruding shape #${i} with ${holesAdded} holes`);
+        createExtrudedShape(mainShape, scale, lowQuality);
+        processedCount++;
+        
+        // Update progress for exports
+        if (isExporting && exportSettings.progressCallback && (processedCount % 5 === 0)) {
+            const progress = Math.round(processedCount / allShapes.length * 100);
+            exportSettings.progressCallback(progress);
+        }
+    }
+    
+    console.log(`Created ${processedCount} extrusions with holes from ${allShapes.length} shapes`);
+    
+    // Hide loading indicator when done (if not exporting)
+    if (!isExporting) {
+        document.getElementById('loading').classList.add('hidden');
+    }
+}
+
+// Calculate the area of a shape to determine winding direction
+function calculateShapeArea(shape) {
+    const points = shape.getPoints(36);
+    let area = 0;
+    
+    // Use shoelace formula to calculate signed area
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+        area += (points[j].x + points[i].x) * (points[j].y - points[i].y);
+    }
+    
+    return area / 2;
+}
+
+// Check if one shape is contained within another
+function isShapeContainedIn(innerShape, outerShape) {
+    const innerPoints = innerShape.getPoints(36); // More sampling points for accuracy
+    const outerPoints = outerShape.getPoints(48);
+    
+    // First quick test: check bounding boxes
+    const innerBounds = getBoundingBox(innerPoints);
+    const outerBounds = getBoundingBox(outerPoints);
+    
+    // If inner bounding box extends beyond outer, it can't be contained
+    if (innerBounds.minX < outerBounds.minX || innerBounds.maxX > outerBounds.maxX ||
+        innerBounds.minY < outerBounds.minY || innerBounds.maxY > outerBounds.maxY) {
+        console.log("Bounding box test failed - shape not contained");
+        return false;
+    }
+    
+    // For a shape to be considered inside another, most of its points should be inside
+    let pointsInside = 0;
+    
+    // Use adaptive threshold based on shape complexity
+    // Smaller shapes need higher percentage to avoid false positives
+    let threshold = 0.7; // Start with 70%
+    
+    // For shapes with few points, use higher threshold
+    if (innerPoints.length < 8) {
+        threshold = 0.85;
+    }
+    
+    // Check if most points are inside
+    for (const point of innerPoints) {
+        if (isPointInPolygon(point, outerPoints)) {
+            pointsInside++;
+        }
+    }
+    
+    const percentInside = pointsInside / innerPoints.length;
+    
+    // Area-based checks
+    const innerArea = Math.abs(calculateShapeArea(innerShape));
+    const outerArea = Math.abs(calculateShapeArea(outerShape));
+    const areaRatio = innerArea / outerArea;
+    
+    // Log detailed containment info for debugging
+    console.log(`Containment test: ${(percentInside * 100).toFixed(1)}% inside, ratio=${areaRatio.toFixed(3)}, threshold=${threshold}`);
+    
+    // Three-part test for hole detection:
+    // 1. Most points must be inside the outer shape
+    // 2. The inner shape must be substantially smaller than the outer shape
+    // 3. For SVGs with many shapes, relax the area constraint
+    return (percentInside >= threshold) && (areaRatio < 0.9);
+}
+
+// Helper function to get bounding box of points
+function getBoundingBox(points) {
+    let minX = Infinity, minY = Infinity;
+    let maxX = -Infinity, maxY = -Infinity;
+    
+    for (const pt of points) {
+        minX = Math.min(minX, pt.x);
+        minY = Math.min(minY, pt.y);
+        maxX = Math.max(maxX, pt.x);
+        maxY = Math.max(maxY, pt.y);
+    }
+    
+    return { minX, minY, maxX, maxY };
+}
+
+// Update sync processing to use improved hole detection
+function processPathsDirectly(paths, options) {
+    const { centerX, centerY, scale, lowQuality, isExporting } = options;
+    const totalPaths = paths.length;
+    
+    console.log(`Processing ${totalPaths} paths directly using simplified approach`);
+    
+    // First collect all shapes with their metadata
+    const allShapes = [];
+    
+    // First pass: create all shapes and gather metadata
+    for (let i = 0; i < totalPaths; i++) {
+        const path = paths[i];
+        console.log(`Processing path ${i+1}/${totalPaths} with ${path.subPaths.length} subpaths`);
+        
+        // Process each subpath
+        path.subPaths.forEach((subPath, subPathIndex) => {
+            try {
+                // Create a shape from the subpath
+                const shape = createShapeFromSubPath(subPath);
+                if (!shape) return;
+                
+                // Center and scale the shape
+                const points = shape.getPoints(36);
+                points.forEach(point => {
+                    point.x = (point.x - centerX) * scale;
+                    point.y = (point.y - centerY) * scale;
+                });
+                
+                // Calculate area to determine winding direction
+                const area = calculateShapeArea(shape);
+                
+                // Store shape with metadata
+                allShapes.push({
+                    shape: shape,
+                    area: Math.abs(area),
+                    isClockwise: area < 0,  // In SVG, clockwise paths are typically holes
+                    pathIndex: i,
+                    subPathIndex: subPathIndex,
+                    processed: false
+                });
+                
+                console.log(`Created shape ${allShapes.length-1} with area ${area.toFixed(2)}, isClockwise: ${area < 0}`);
+                
+            } catch (error) {
+                console.error(`Error processing subpath ${subPathIndex}:`, error);
+            }
+        });
+    }
+    
+    // Sort shapes by area, largest first (outer shapes tend to be larger)
+    allShapes.sort((a, b) => b.area - a.area);
+    
+    // Second pass: identify outer shapes and their holes
+    let processedCount = 0;
+    
+    // Process large shapes first as potential outer shapes
+    for (let i = 0; i < allShapes.length; i++) {
+        if (allShapes[i].processed) continue;
+        
+        const outerShape = allShapes[i];
+        outerShape.processed = true;
+        
+        // IMPROVED: More permissive hole detection (almost no auto-skipping)
+        // Only skip tiny shapes that are likely to be artifacts
+        if (outerShape.isClockwise && 
+            outerShape.area < allShapes[0].area * 0.01) { // Reduced from 0.1 to 0.01
+            console.log(`Skipping very small shape #${i} (area ratio: ${(outerShape.area/allShapes[0].area).toFixed(4)})`);
+            continue;
+        }
+        
+        // Create a new shape for extrusion
+        const mainShape = new THREE.Shape();
+        
+        // Copy points from the outer shape
+        const mainPoints = outerShape.shape.getPoints(36);
+        mainPoints.forEach((point, idx) => {
+            if (idx === 0) mainShape.moveTo(point.x, point.y);
+            else mainShape.lineTo(point.x, point.y);
+        });
+        
+        // Find holes for this shape - improved hole detection logic
+        let holesAdded = 0;
+        
+        for (let j = 0; j < allShapes.length; j++) {
+            if (i === j || allShapes[j].processed) continue;
+            
+            const potentialHole = allShapes[j];
+            
+            // A hole should be substantially smaller
+            if (potentialHole.area >= outerShape.area * 0.9) continue;
+            
+            // Test if shape is contained inside - improved containment test
+            if (isShapeContainedIn(potentialHole.shape, outerShape.shape)) {
+                console.log(`Found hole: shape #${j} inside shape #${i} (area ratio: ${(potentialHole.area/outerShape.area).toFixed(3)})`);
+                potentialHole.processed = true;
+                
+                // Add as a hole
+                const holePath = new THREE.Path();
+                const holePoints = potentialHole.shape.getPoints(36);
+                
+                holePoints.forEach((point, idx) => {
+                    if (idx === 0) holePath.moveTo(point.x, point.y);
+                    else holePath.lineTo(point.x, point.y);
+                });
+                
+                holePath.closePath();
+                mainShape.holes.push(holePath);
+                holesAdded++;
+            }
+        }
+        
+        // Create extrusion with any detected holes
+        console.log(`Extruding shape #${i} with ${holesAdded} holes`);
+        createExtrudedShape(mainShape, scale, lowQuality);
+        processedCount++;
+        
+        // Update progress for exports
+        if (isExporting && exportSettings.progressCallback && (processedCount % 5 === 0)) {
+            const progress = Math.round(processedCount / allShapes.length * 100);
+            exportSettings.progressCallback(progress);
+        }
+    }
+    
+    console.log(`Created ${processedCount} extrusions with holes from ${allShapes.length} shapes`);
+    
+    // Hide loading indicator when done (if not exporting)
+    if (!isExporting) {
+        document.getElementById('loading').classList.add('hidden');
+    }
+}
+
+// Calculate the area of a shape to determine winding direction
+function calculateShapeArea(shape) {
+    const points = shape.getPoints(36);
+    let area = 0;
+    
+    // Use shoelace formula to calculate signed area
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+        area += (points[j].x + points[i].x) * (points[j].y - points[i].y);
+    }
+    
+    return area / 2;
+}
+
+// Check if one shape is contained within another
+function isShapeContainedIn(innerShape, outerShape) {
+    const innerPoints = innerShape.getPoints(36); // More sampling points for accuracy
+    const outerPoints = outerShape.getPoints(48);
+    
+    // First quick test: check bounding boxes
+    const innerBounds = getBoundingBox(innerPoints);
+    const outerBounds = getBoundingBox(outerPoints);
+    
+    // If inner bounding box extends beyond outer, it can't be contained
+    if (innerBounds.minX < outerBounds.minX || innerBounds.maxX > outerBounds.maxX ||
+        innerBounds.minY < outerBounds.minY || innerBounds.maxY > outerBounds.maxY) {
+        console.log("Bounding box test failed - shape not contained");
+        return false;
+    }
+    
+    // For a shape to be considered inside another, most of its points should be inside
+    let pointsInside = 0;
+    
+    // Use adaptive threshold based on shape complexity
+    // Smaller shapes need higher percentage to avoid false positives
+    let threshold = 0.7; // Start with 70%
+    
+    // For shapes with few points, use higher threshold
+    if (innerPoints.length < 8) {
+        threshold = 0.85;
+    }
+    
+    // Check if most points are inside
+    for (const point of innerPoints) {
+        if (isPointInPolygon(point, outerPoints)) {
+            pointsInside++;
+        }
+    }
+    
+    const percentInside = pointsInside / innerPoints.length;
+    
+    // Area-based checks
+    const innerArea = Math.abs(calculateShapeArea(innerShape));
+    const outerArea = Math.abs(calculateShapeArea(outerShape));
+    const areaRatio = innerArea / outerArea;
+    
+    // Log detailed containment info for debugging
+    console.log(`Containment test: ${(percentInside * 100).toFixed(1)}% inside, ratio=${areaRatio.toFixed(3)}, threshold=${threshold}`);
+    
+    // Three-part test for hole detection:
+    // 1. Most points must be inside the outer shape
+    // 2. The inner shape must be substantially smaller than the outer shape
+    // 3. For SVGs with many shapes, relax the area constraint
+    return (percentInside >= threshold) && (areaRatio < 0.9);
+}
+
+// Helper function to get bounding box of points
+function getBoundingBox(points) {
+    let minX = Infinity, minY = Infinity;
+    let maxX = -Infinity, maxY = -Infinity;
+    
+    for (const pt of points) {
+        minX = Math.min(minX, pt.x);
+        minY = Math.min(minY, pt.y);
+        maxX = Math.max(maxX, pt.x);
+        maxY = Math.max(maxY, pt.y);
+    }
+    
+    return { minX, minY, maxX, maxY };
+}
+
+// Update sync processing to use improved hole detection
+function processPathsDirectly(paths, options) {
+    const { centerX, centerY, scale, lowQuality, isExporting } = options;
+    const totalPaths = paths.length;
+    
+    console.log(`Processing ${totalPaths} paths directly using simplified approach`);
+    
+    // First collect all shapes with their metadata
+    const allShapes = [];
+    
+    // First pass: create all shapes and gather metadata
+    for (let i = 0; i < totalPaths; i++) {
+        const path = paths[i];
+        console.log(`Processing path ${i+1}/${totalPaths} with ${path.subPaths.length} subpaths`);
+        
+        // Process each subpath
+        path.subPaths.forEach((subPath, subPathIndex) => {
+            try {
+                // Create a shape from the subpath
+                const shape = createShapeFromSubPath(subPath);
+                if (!shape) return;
+                
+                // Center and scale the shape
+                const points = shape.getPoints(36);
+                points.forEach(point => {
+                    point.x = (point.x - centerX) * scale;
+                    point.y = (point.y - centerY) * scale;
+                });
+                
+                // Calculate area to determine winding direction
+                const area = calculateShapeArea(shape);
+                
+                // Store shape with metadata
+                allShapes.push({
+                    shape: shape,
+                    area: Math.abs(area),
+                    isClockwise: area < 0,  // In SVG, clockwise paths are typically holes
+                    pathIndex: i,
+                    subPathIndex: subPathIndex,
+                    processed: false
+                });
+                
+                console.log(`Created shape ${allShapes.length-1} with area ${area.toFixed(2)}, isClockwise: ${area < 0}`);
+                
+            } catch (error) {
+                console.error(`Error processing subpath ${subPathIndex}:`, error);
+            }
+        });
+    }
+    
+    // Sort shapes by area, largest first (outer shapes tend to be larger)
+    allShapes.sort((a, b) => b.area - a.area);
+    
+    // Second pass: identify outer shapes and their holes
+    let processedCount = 0;
+    
+    // Process large shapes first as potential outer shapes
+    for (let i = 0; i < allShapes.length; i++) {
+        if (allShapes[i].processed) continue;
+        
+        const outerShape = allShapes[i];
+        outerShape.processed = true;
+        
+        // IMPROVED: More permissive hole detection (almost no auto-skipping)
+        // Only skip tiny shapes that are likely to be artifacts
+        if (outerShape.isClockwise && 
+            outerShape.area < allShapes[0].area * 0.01) { // Reduced from 0.1 to 0.01
+            console.log(`Skipping very small shape #${i} (area ratio: ${(outerShape.area/allShapes[0].area).toFixed(4)})`);
+            continue;
+        }
+        
+        // Create a new shape for extrusion
+        const mainShape = new THREE.Shape();
+        
+        // Copy points from the outer shape
+        const mainPoints = outerShape.shape.getPoints(36);
+        mainPoints.forEach((point, idx) => {
+            if (idx === 0) mainShape.moveTo(point.x, point.y);
+            else mainShape.lineTo(point.x, point.y);
+        });
+        
+        // Find holes for this shape - improved hole detection logic
+        let holesAdded = 0;
+        
+        for (let j = 0; j < allShapes.length; j++) {
+            if (i === j || allShapes[j].processed) continue;
+            
+            const potentialHole = allShapes[j];
+            
+            // A hole should be substantially smaller
+            if (potentialHole.area >= outerShape.area * 0.9) continue;
+            
+            // Test if shape is contained inside - improved containment test
+            if (isShapeContainedIn(potentialHole.shape, outerShape.shape)) {
+                console.log(`Found hole: shape #${j} inside shape #${i} (area ratio: ${(potentialHole.area/outerShape.area).toFixed(3)})`);
+                potentialHole.processed = true;
+                
+                // Add as a hole
+                const holePath = new THREE.Path();
+                const holePoints = potentialHole.shape.getPoints(36);
+                
+                holePoints.forEach((point, idx) => {
+                    if (idx === 0) holePath.moveTo(point.x, point.y);
+                    else holePath.lineTo(point.x, point.y);
+                });
+                
+                holePath.closePath();
+                mainShape.holes.push(holePath);
+                holesAdded++;
+            }
+        }
+        
+        // Create extrusion with any detected holes
+        console.log(`Extruding shape #${i} with ${holesAdded} holes`);
+        createExtrudedShape(mainShape, scale, lowQuality);
+        processedCount++;
+        
+        // Update progress for exports
+        if (isExporting && exportSettings.progressCallback && (processedCount % 5 === 0)) {
+            const progress = Math.round(processedCount / allShapes.length * 100);
+            exportSettings.progressCallback(progress);
+        }
+    }
+    
+    console.log(`Created ${processedCount} extrusions with holes from ${allShapes.length} shapes`);
+    
+    // Hide loading indicator when done (if not exporting)
+    if (!isExporting) {
+        document.getElementById('loading').classList.add('hidden');
+    }
+}
+
+// Calculate the area of a shape to determine winding direction
+function calculateShapeArea(shape) {
+    const points = shape.getPoints(36);
+    let area = 0;
+    
+    // Use shoelace formula to calculate signed area
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+        area += (points[j].x + points[i].x) * (points[j].y - points[i].y);
+    }
+    
+    return area / 2;
+}
+
+// Check if one shape is contained within another
+function isShapeContainedIn(innerShape, outerShape) {
+    const innerPoints = innerShape.getPoints(36); // More sampling points for accuracy
+    const outerPoints = outerShape.getPoints(48);
+    
+    // First quick test: check bounding boxes
+    const innerBounds = getBoundingBox(innerPoints);
+    const outerBounds = getBoundingBox(outerPoints);
+    
+    // If inner bounding box extends beyond outer, it can't be contained
+    if (innerBounds.minX < outerBounds.minX || innerBounds.maxX > outerBounds.maxX ||
+        innerBounds.minY < outerBounds.minY || innerBounds.maxY > outerBounds.maxY) {
+        console.log("Bounding box test failed - shape not contained");
+        return false;
+    }
+    
+    // For a shape to be considered inside another, most of its points should be inside
+    let pointsInside = 0;
+    
+    // Use adaptive threshold based on shape complexity
+    // Smaller shapes need higher percentage to avoid false positives
+    let threshold = 0.7; // Start with 70%
+    
+    // For shapes with few points, use higher threshold
+    if (innerPoints.length < 8) {
+        threshold = 0.85;
+    }
+    
+    // Check if most points are inside
+    for (const point of innerPoints) {
+        if (isPointInPolygon(point, outerPoints)) {
+            pointsInside++;
+        }
+    }
+    
+    const percentInside = pointsInside / innerPoints.length;
+    
+    // Area-based checks
+    const innerArea = Math.abs(calculateShapeArea(innerShape));
+    const outerArea = Math.abs(calculateShapeArea(outerShape));
+    const areaRatio = innerArea / outerArea;
+    
+    // Log detailed containment info for debugging
+    console.log(`Containment test: ${(percentInside * 100).toFixed(1)}% inside, ratio=${areaRatio.toFixed(3)}, threshold=${threshold}`);
+    
+    // Three-part test for hole detection:
+    // 1. Most points must be inside the outer shape
+    // 2. The inner shape must be substantially smaller than the outer shape
+    // 3. For SVGs with many shapes, relax the area constraint
+    return (percentInside >= threshold) && (areaRatio < 0.9);
+}
+
+// Helper function to get bounding box of points
+function getBoundingBox(points) {
+    let minX = Infinity, minY = Infinity;
+    let maxX = -Infinity, maxY = -Infinity;
+    
+    for (const pt of points) {
+        minX = Math.min(minX, pt.x);
+        minY = Math.min(minY, pt.y);
+        maxX = Math.max(maxX, pt.x);
+        maxY = Math.max(maxY, pt.y);
+    }
+    
+    return { minX, minY, maxX, maxY };
+}
+
+// Update sync processing to use improved hole detection
+function processPathsDirectly(paths, options) {
+    const { centerX, centerY, scale, lowQuality, isExporting } = options;
+    const totalPaths = paths.length;
+    
+    console.log(`Processing ${totalPaths} paths directly using simplified approach`);
+    
+    // First collect all shapes with their metadata
+    const allShapes = [];
+    
+    // First pass: create all shapes and gather metadata
+    for (let i = 0; i < totalPaths; i++) {
+        const path = paths[i];
+        console.log(`Processing path ${i+1}/${totalPaths} with ${path.subPaths.length} subpaths`);
+        
+        // Process each subpath
+        path.subPaths.forEach((subPath, subPathIndex) => {
+            try {
+                // Create a shape from the subpath
+                const shape = createShapeFromSubPath(subPath);
+                if (!shape) return;
+                
+                // Center and scale the shape
+                const points = shape.getPoints(36);
+                points.forEach(point => {
+                    point.x = (point.x - centerX) * scale;
+                    point.y = (point.y - centerY) * scale;
+                });
+                
+                // Calculate area to determine winding direction
+                const area = calculateShapeArea(shape);
+                
+                // Store shape with metadata
+                allShapes.push({
+                    shape: shape,
+                    area: Math.abs(area),
+                    isClockwise: area < 0,  // In SVG, clockwise paths are typically holes
+                    pathIndex: i,
+                    subPathIndex: subPathIndex,
+                    processed: false
+                });
+                
+                console.log(`Created shape ${allShapes.length-1} with area ${area.toFixed(2)}, isClockwise: ${area < 0}`);
+                
+            } catch (error) {
+                console.error(`Error processing subpath ${subPathIndex}:`, error);
+            }
+        });
+    }
+    
+    // Sort shapes by area, largest first (outer shapes tend to be larger)
+    allShapes.sort((a, b) => b.area - a.area);
+    
+    // Second pass: identify outer shapes and their holes
+    let processedCount = 0;
+    
+    // Process large shapes first as potential outer shapes
+    for (let i = 0; i < allShapes.length; i++) {
+        if (allShapes[i].processed) continue;
+        
+        const outerShape = allShapes[i];
+        outerShape.processed = true;
+        
+        // IMPROVED: More permissive hole detection (almost no auto-skipping)
+        // Only skip tiny shapes that are likely to be artifacts
+        if (outerShape.isClockwise && 
+            outerShape.area < allShapes[0].area * 0.01) { // Reduced from 0.1 to 0.01
+            console.log(`Skipping very small shape #${i} (area ratio: ${(outerShape.area/allShapes[0].area).toFixed(4)})`);
+            continue;
+        }
+        
+        // Create a new shape for extrusion
+        const mainShape = new THREE.Shape();
+        
+        // Copy points from the outer shape
+        const mainPoints = outerShape.shape.getPoints(36);
+        mainPoints.forEach((point, idx) => {
+            if (idx === 0) mainShape.moveTo(point.x, point.y);
+            else mainShape.lineTo(point.x, point.y);
+        });
+        
+        // Find holes for this shape - improved hole detection logic
+        let holesAdded = 0;
+        
+        for (let j = 0; j < allShapes.length; j++) {
+            if (i === j || allShapes[j].processed) continue;
+            
+            const potentialHole = allShapes[j];
+            
+            // A hole should be substantially smaller
+            if (potentialHole.area >= outerShape.area * 0.9) continue;
+            
+            // Test if shape is contained inside - improved containment test
+            if (isShapeContainedIn(potentialHole.shape, outerShape.shape)) {
+                console.log(`Found hole: shape #${j} inside shape #${i} (area ratio: ${(potentialHole.area/outerShape.area).toFixed(3)})`);
+                potentialHole.processed = true;
+                
+                // Add as a hole
+                const holePath = new THREE.Path();
+                const holePoints = potentialHole.shape.getPoints(36);
+                
+                holePoints.forEach((point, idx) => {
+                    if (idx === 0) holePath.moveTo(point.x, point.y);
+                    else holePath.lineTo(point.x, point.y);
+                });
+                
+                holePath.closePath();
+                mainShape.holes.push(holePath);
+                holesAdded++;
+            }
+        }
+        
+        // Create extrusion with any detected holes
+        console.log(`Extruding shape #${i} with ${holesAdded} holes`);
+        createExtrudedShape(mainShape, scale, lowQuality);
+        processedCount++;
+        
+        // Update progress for exports
+        if (isExporting && exportSettings.progressCallback && (processedCount % 5 === 0)) {
+            const progress = Math.round(processedCount / allShapes.length * 100);
+            exportSettings.progressCallback(progress);
+        }
+    }
+    
+    console.log(`Created ${processedCount} extrusions with holes from ${allShapes.length} shapes`);
+    
+    // Hide loading indicator when done (if not exporting)
+    if (!isExporting) {
+        document.getElementById('loading').classList.add('hidden');
+    }
+}
+
+// Calculate the area of a shape to determine winding direction
+function calculateShapeArea(shape) {
+    const points = shape.getPoints(36);
+    let area = 0;
+    
+    // Use shoelace formula to calculate signed area
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+        area += (points[j].x + points[i].x) * (points[j].y - points[i].y);
+    }
+    
+    return area / 2;
+}
+
+// Check if one shape is contained within another
+function isShapeContainedIn(innerShape, outerShape) {
+    const innerPoints = innerShape.getPoints(36); // More sampling points for accuracy
+    const outerPoints = outerShape.getPoints(48);
+    
+    // First quick test: check bounding boxes
+    const innerBounds = getBoundingBox(innerPoints);
+    const outerBounds = getBoundingBox(outerPoints);
+    
+    // If inner bounding box extends beyond outer, it can't be contained
+    if (innerBounds.minX < outerBounds.minX || innerBounds.maxX > outerBounds.maxX ||
+        innerBounds.minY < outerBounds.minY || innerBounds.maxY > outerBounds.maxY) {
+        console.log("Bounding box test failed - shape not contained");
+        return false;
+    }
+    
+    // For a shape to be considered inside another, most of its points should be inside
+    let pointsInside = 0;
+    
+    // Use adaptive threshold based on shape complexity
+    // Smaller shapes need higher percentage to avoid false positives
+    let threshold = 0.7; // Start with 70%
+    
+    // For shapes with few points, use higher threshold
+    if (innerPoints.length < 8) {
+        threshold = 0.85;
+    }
+    
+    // Check if most points are inside
+    for (const point of innerPoints) {
+        if (isPointInPolygon(point, outerPoints)) {
+            pointsInside++;
+        }
+    }
+    
+    const percentInside = pointsInside / innerPoints.length;
+    
+    // Area-based checks
+    const innerArea = Math.abs(calculateShapeArea(innerShape));
+    const outerArea = Math.abs(calculateShapeArea(outerShape));
+    const areaRatio = innerArea / outerArea;
+    
+    // Log detailed containment info for debugging
+    console.log(`Containment test: ${(percentInside * 100).toFixed(1)}% inside, ratio=${areaRatio.toFixed(3)}, threshold=${threshold}`);
+    
+    // Three-part test for hole detection:
+    // 1. Most points must be inside the outer shape
+    // 2. The inner shape must be substantially smaller than the outer shape
+    // 3. For SVGs with many shapes, relax the area constraint
+    return (percentInside >= threshold) && (areaRatio < 0.9);
+}
+
+// Helper function to get bounding box of points
+function getBoundingBox(points) {
+    let minX = Infinity, minY = Infinity;
+    let maxX = -Infinity, maxY = -Infinity;
+    
+    for (const pt of points) {
+        minX = Math.min(minX, pt.x);
+        minY = Math.min(minY, pt.y);
+        maxX = Math.max(maxX, pt.x);
+        maxY = Math.max(maxY, pt.y);
+    }
+    
+    return { minX, minY, maxX, maxY };
+}
+
+// Update sync processing to use improved hole detection
+function processPathsDirectly(paths, options) {
+    const { centerX, centerY, scale, lowQuality, isExporting } = options;
+    const totalPaths = paths.length;
+    
+    console.log(`Processing ${totalPaths} paths directly using simplified approach`);
+    
+    // First collect all shapes with their metadata
+    const allShapes = [];
+    
+    // First pass: create all shapes and gather metadata
+    for (let i = 0; i < totalPaths; i++) {
+        const path = paths[i];
+        console.log(`Processing path ${i+1}/${totalPaths} with ${path.subPaths.length} subpaths`);
+        
+        // Process each subpath
+        path.subPaths.forEach((subPath, subPathIndex) => {
+            try {
+                // Create a shape from the subpath
+                const shape = createShapeFromSubPath(subPath);
+                if (!shape) return;
+                
+                // Center and scale the shape
+                const points = shape.getPoints(36);
+                points.forEach(point => {
+                    point.x = (point.x - centerX) * scale;
+                    point.y = (point.y - centerY) * scale;
+                });
+                
+                // Calculate area to determine winding direction
+                const area = calculateShapeArea(shape);
+                
+                // Store shape with metadata
+                allShapes.push({
+                    shape: shape,
+                    area: Math.abs(area),
+                    isClockwise: area < 0,  // In SVG, clockwise paths are typically holes
+                    pathIndex: i,
+                    subPathIndex: subPathIndex,
+                    processed: false
+                });
+                
+                console.log(`Created shape ${allShapes.length-1} with area ${area.toFixed(2)}, isClockwise: ${area < 0}`);
+                
+            } catch (error) {
+                console.error(`Error processing subpath ${subPathIndex}:`, error);
+            }
+        });
+    }
+    
+    // Sort shapes by area, largest first (outer shapes tend to be larger)
+    allShapes.sort((a, b) => b.area - a.area);
+    
+    // Second pass: identify outer shapes and their holes
+    let processedCount = 0;
+    
+    // Process large shapes first as potential outer shapes
+    for (let i = 0; i < allShapes.length; i++) {
+        if (allShapes[i].processed) continue;
+        
+        const outerShape = allShapes[i];
+        outerShape.processed = true;
+        
+        // IMPROVED: More permissive hole detection (almost no auto-skipping)
+        // Only skip tiny shapes that are likely to be artifacts
+        if (outerShape.isClockwise && 
+            outerShape.area < allShapes[0].area * 0.01) { // Reduced from 0.1 to 0.01
+            console.log(`Skipping very small shape #${i} (area ratio: ${(outerShape.area/allShapes[0].area).toFixed(4)})`);
+            continue;
+        }
+        
+        // Create a new shape for extrusion
+        const mainShape = new THREE.Shape();
+        
+        // Copy points from the outer shape
+        const mainPoints = outerShape.shape.getPoints(36);
+        mainPoints.forEach((point, idx) => {
+            if (idx === 0) mainShape.moveTo(point.x, point.y);
+            else mainShape.lineTo(point.x, point.y);
+        });
+        
+        // Find holes for this shape - improved hole detection logic
+        let holesAdded = 0;
+        
+        for (let j = 0; j < allShapes.length; j++) {
+            if (i === j || allShapes[j].processed) continue;
+            
+            const potentialHole = allShapes[j];
+            
+            // A hole should be substantially smaller
+            if (potentialHole.area >= outerShape.area * 0.9) continue;
+            
+            // Test if shape is contained inside - improved containment test
+            if (isShapeContainedIn(potentialHole.shape, outerShape.shape)) {
+                console.log(`Found hole: shape #${j} inside shape #${i} (area ratio: ${(potentialHole.area/outerShape.area).toFixed(3)})`);
+                potentialHole.processed = true;
+                
+                // Add as a hole
+                const holePath = new THREE.Path();
+                const holePoints = potentialHole.shape.getPoints(36);
+                
+                holePoints.forEach((point, idx) => {
+                    if (idx === 0) holePath.moveTo(point.x, point.y);
+                    else holePath.lineTo(point.x, point.y);
+                });
+                
+                holePath.closePath();
+                mainShape.holes.push(holePath);
+                holesAdded++;
+            }
+        }
+        
+        // Create extrusion with any detected holes
+        console.log(`Extruding shape #${i} with ${holesAdded} holes`);
+        createExtrudedShape(mainShape, scale, lowQuality);
+        processedCount++;
+        
+        // Update progress for exports
+        if (isExporting && exportSettings.progressCallback && (processedCount % 5 === 0)) {
+            const progress = Math.round(processedCount / allShapes.length * 100);
+            exportSettings.progressCallback(progress);
+        }
+    }
+    
+    console.log(`Created ${processedCount} extrusions with holes from ${allShapes.length} shapes`);
+    
+    // Hide loading indicator when done (if not exporting)
+    if (!isExporting) {
+        document.getElementById('loading').classList.add('hidden');
+    }
+}
+
+// Calculate the area of a shape to determine winding direction
+function calculateShapeArea(shape) {
+    const points = shape.getPoints(36);
+    let area = 0;
+    
+    // Use shoelace formula to calculate signed area
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+        area += (points[j].x + points[i].x) * (points[j].y - points[i].y);
+    }
+    
+    return area / 2;
+}
+
+// Check if one shape is contained within another
+function isShapeContainedIn(innerShape, outerShape) {
+    const innerPoints = innerShape.getPoints(36); // More sampling points for accuracy
+    const outerPoints = outerShape.getPoints(48);
+    
+    // First quick test: check bounding boxes
+    const innerBounds = getBoundingBox(innerPoints);
+    const outerBounds = getBoundingBox(outerPoints);
+    
+    // If inner bounding box extends beyond outer, it can't be contained
+    if (innerBounds.minX < outerBounds.minX || innerBounds.maxX > outerBounds.maxX ||
+        innerBounds.minY < outerBounds.minY || innerBounds.maxY > outerBounds.maxY) {
+        console.log("Bounding box test failed - shape not contained");
+        return false;
+    }
+    
+    // For a shape to be considered inside another, most of its points should be inside
+    let pointsInside = 0;
+    
+    // Use adaptive threshold based on shape complexity
+    // Smaller shapes need higher percentage to avoid false positives
+    let threshold = 0.7; // Start with 70%
+    
+    // For shapes with few points, use higher threshold
+    if (innerPoints.length < 8) {
+        threshold = 0.85;
+    }
+    
+    // Check if most points are inside
+    for (const point of innerPoints) {
+        if (isPointInPolygon(point, outerPoints)) {
+            pointsInside++;
+        }
+    }
+    
+    const percentInside = pointsInside / innerPoints.length;
+    
+    // Area-based checks
+    const innerArea = Math.abs(calculateShapeArea(innerShape));
+    const outerArea = Math.abs(calculateShapeArea(outerShape));
+    const areaRatio = innerArea / outerArea;
+    
+    // Log detailed containment info for debugging
+    console.log(`Containment test: ${(percentInside * 100).toFixed(1)}% inside, ratio=${areaRatio.toFixed(3)}, threshold=${threshold}`);
+    
+    // Three-part test for hole detection:
+    // 1. Most points must be inside the outer shape
+    // 2. The inner shape must be substantially smaller than the outer shape
+    // 3. For SVGs with many shapes, relax the area constraint
+    return (percentInside >= threshold) && (areaRatio < 0.9);
+}
+
+// Helper function to get bounding box of points
+function getBoundingBox(points) {
+    let minX = Infinity, minY = Infinity;
+    let maxX = -Infinity, maxY = -Infinity;
+    
+    for (const pt of points) {
+        minX = Math.min(minX, pt.x);
+        minY = Math.min(minY, pt.y);
+        maxX = Math.max(maxX, pt.x);
+        maxY = Math.max(maxY, pt.y);
+    }
+    
+    return { minX, minY, maxX, maxY };
+}
+
+// Update sync processing to use improved hole detection
+function processPathsDirectly(paths, options) {
+    const { centerX, centerY, scale, lowQuality, isExporting } = options;
+    const totalPaths = paths.length;
+    
+    console.log(`Processing ${totalPaths} paths directly using simplified approach`);
+    
+    // First collect all shapes with their metadata
+    const allShapes = [];
+    
+    // First pass: create all shapes and gather metadata
+    for (let i = 0; i < totalPaths; i++) {
+        const path = paths[i];
+        console.log(`Processing path ${i+1}/${totalPaths} with ${path.subPaths.length} subpaths`);
+        
+        // Process each subpath
+        path.subPaths.forEach((subPath, subPathIndex) => {
+            try {
+                // Create a shape from the subpath
+                const shape = createShapeFromSubPath(subPath);
+                if (!shape) return;
+                
+                // Center and scale the shape
+                const points = shape.getPoints(36);
+                points.forEach(point => {
+                    point.x = (point.x - centerX) * scale;
+                    point.y = (point.y - centerY) * scale;
+                });
+                
+                // Calculate area to determine winding direction
+                const area = calculateShapeArea(shape);
+                
+                // Store shape with metadata
+                allShapes.push({
+                    shape: shape,
+                    area: Math.abs(area),
+                    isClockwise: area < 0,  // In SVG, clockwise paths are typically holes
+                    pathIndex: i,
+                    subPathIndex: subPathIndex,
+                    processed: false
+                });
+                
+                console.log(`Created shape ${allShapes.length-1} with area ${area.toFixed(2)}, isClockwise: ${area < 0}`);
+                
+            } catch (error) {
+                console.error(`Error processing subpath ${subPathIndex}:`, error);
+            }
+        });
+    }
+    
+    // Sort shapes by area, largest first (outer shapes tend to be larger)
+    allShapes.sort((a, b) => b.area - a.area);
+    
+    // Second pass: identify outer shapes and their holes
+    let processedCount = 0;
+    
+    // Process large shapes first as potential outer shapes
+    for (let i = 0; i < allShapes.length; i++) {
+        if (allShapes[i].processed) continue;
+        
+        const outerShape = allShapes[i];
+        outerShape.processed = true;
+        
+        // IMPROVED: More permissive hole detection (almost no auto-skipping)
+        // Only skip tiny shapes that are likely to be artifacts
+        if (outerShape.isClockwise && 
+            outerShape.area < allShapes[0].area * 0.01) { // Reduced from 0.1 to 0.01
+            console.log(`Skipping very small shape #${i} (area ratio: ${(outerShape.area/allShapes[0].area).toFixed(4)})`);
+            continue;
+        }
+        
+        // Create a new shape for extrusion
+        const mainShape = new THREE.Shape();
+        
+        // Copy points from the outer shape
+        const mainPoints = outerShape.shape.getPoints(36);
+        mainPoints.forEach((point, idx) => {
+            if (idx === 0) mainShape.moveTo(point.x, point.y);
+            else mainShape.lineTo(point.x, point.y);
+        });
+        
+        // Find holes for this shape - improved hole detection logic
+        let holesAdded = 0;
+        
+        for (let j = 0; j < allShapes.length; j++) {
+            if (i === j || allShapes[j].processed) continue;
+            
+            const potentialHole = allShapes[j];
+            
+            // A hole should be substantially smaller
+            if (potentialHole.area >= outerShape.area * 0.9) continue;
+            
+            // Test if shape is contained inside - improved containment test
+            if (isShapeContainedIn(potentialHole.shape, outerShape.shape)) {
+                console.log(`Found hole: shape #${j} inside shape #${i} (area ratio: ${(potentialHole.area/outerShape.area).toFixed(3)})`);
+                potentialHole.processed = true;
+                
+                // Add as a hole
+                const holePath = new THREE.Path();
+                const holePoints = potentialHole.shape.getPoints(36);
+                
+                holePoints.forEach((point, idx) => {
+                    if (idx === 0) holePath.moveTo(point.x, point.y);
+                    else holePath.lineTo(point.x, point.y);
+                });
+                
+                holePath.closePath();
+                mainShape.holes.push(holePath);
+                holesAdded++;
+            }
+        }
+        
+        // Create extrusion with any detected holes
+        console.log(`Extruding shape #${i} with ${holesAdded} holes`);
+        createExtrudedShape(mainShape, scale, lowQuality);
+        processedCount++;
+        
+        // Update progress for exports
+        if (isExporting && exportSettings.progressCallback && (processedCount % 5 === 0)) {
+            const progress = Math.round(processedCount / allShapes.length * 100);
+            exportSettings.progressCallback(progress);
+        }
+    }
+    
+    console.log(`Created ${processedCount} extrusions with holes from ${allShapes.length} shapes`);
+    
+    // Hide loading indicator when done (if not exporting)
+    if (!isExporting) {
+        document.getElementById('loading').classList.add('hidden');
+    }
+}
+
+// Calculate the area of a shape to determine winding direction
+function calculateShapeArea(shape) {
+    const points = shape.getPoints(36);
+    let area = 0;
+    
+    // Use shoelace formula to calculate signed area
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+        area += (points[j].x + points[i].x) * (points[j].y - points[i].y);
+    }
+    
+    return area / 2;
+}
+
+// Check if one shape is contained within another
+function isShapeContainedIn(innerShape, outerShape) {
+    const innerPoints = innerShape.getPoints(36); // More sampling points for accuracy
+    const outerPoints = outerShape.getPoints(48);
+    
+    // First quick test: check bounding boxes
+    const innerBounds = getBoundingBox(innerPoints);
+    const outerBounds = getBoundingBox(outerPoints);
+    
+    // If inner bounding box extends beyond outer, it can't be contained
+    if (innerBounds.minX < outerBounds.minX || innerBounds.maxX > outerBounds.maxX ||
+        innerBounds.minY < outerBounds.minY || innerBounds.maxY > outerBounds.maxY) {
+        console.log("Bounding box test failed - shape not contained");
+        return false;
+    }
+    
+    // For a shape to be considered inside another, most of its points should be inside
+    let pointsInside = 0;
+    
+    // Use adaptive threshold based on shape complexity
+    // Smaller shapes need higher percentage to avoid false positives
+    let threshold = 0.7; // Start with 70%
+    
+    // For shapes with few points, use higher threshold
+    if (innerPoints.length < 8) {
+        threshold = 0.85;
+    }
+    
+    // Check if most points are inside
+    for (const point of innerPoints) {
+        if (isPointInPolygon(point, outerPoints)) {
+            pointsInside++;
+        }
+    }
+    
+    const percentInside = pointsInside / innerPoints.length;
+    
+    // Area-based checks
+    const innerArea = Math.abs(calculateShapeArea(innerShape));
+    const outerArea = Math.abs(calculateShapeArea(outerShape));
+    const areaRatio = innerArea / outerArea;
+    
+    // Log detailed containment info for debugging
+    console.log(`Containment test: ${(percentInside * 100).toFixed(1)}% inside, ratio=${areaRatio.toFixed(3)}, threshold=${threshold}`);
+    
+    // Three-part test for hole detection:
+    // 1. Most points must be inside the outer shape
+    // 2. The inner shape must be substantially smaller than the outer shape
+    // 3. For SVGs with many shapes, relax the area constraint
+    return (percentInside >= threshold) && (areaRatio < 0.9);
+}
+
+// Helper function to get bounding box of points
+function getBoundingBox(points) {
+    let minX = Infinity, minY = Infinity;
+    let maxX = -Infinity, maxY = -Infinity;
+    
+    for (const pt of points) {
+        minX = Math.min(minX, pt.x);
+        minY = Math.min(minY, pt.y);
+        maxX = Math.max(maxX, pt.x);
+        maxY = Math.max(maxY, pt.y);
+    }
+    
+    return { minX, minY, maxX, maxY };
 }
 
 // Update the async version to use the same hole detection logic
@@ -449,10 +1966,12 @@ function processPathsDirectlyAsync(paths, options) {
             const outerShape = allShapes[processedShapeIndex];
             outerShape.processed = true;
             
-            // Skip small clockwise shapes as they're likely holes without a parent
-            if (outerShape.isClockwise && processedShapeIndex > 0 && 
-                outerShape.area < allShapes[0].area * 0.5) {
-                console.log(`Skipping likely hole shape #${processedShapeIndex}`);
+            // IMPROVED: More permissive hole detection (almost no auto-skipping)
+            // Only skip tiny shapes that are likely to be artifacts
+            if (outerShape.isClockwise && 
+                processedShapeIndex > 0 && 
+                outerShape.area < allShapes[0].area * 0.01) { // Reduced from 0.1 to 0.01
+                console.log(`Skipping very small shape #${processedShapeIndex} (area ratio: ${(outerShape.area/allShapes[0].area).toFixed(4)})`);
                 processedShapeIndex++;
                 continue;
             }
@@ -475,8 +1994,10 @@ function processPathsDirectlyAsync(paths, options) {
                 
                 const potentialHole = allShapes[j];
                 
+                // A hole should be substantially smaller
                 if (potentialHole.area >= outerShape.area * 0.9) continue;
                 
+                // Test if shape is contained inside - improved containment test
                 if (isShapeContainedIn(potentialHole.shape, outerShape.shape)) {
                     console.log(`Found hole: shape #${j} inside shape #${processedShapeIndex}`);
                     potentialHole.processed = true;
@@ -525,6 +2046,44 @@ function processPathsDirectlyAsync(paths, options) {
     collectShapes();
 }
 
+// Check if a point is inside a polygon using ray casting algorithm - fixed implementation
+function isPointInPolygon(point, polygon) {
+    if (!point || !polygon || polygon.length === 0) return false;
+    
+    // Use a more robust ray-casting algorithm with special handling for edge cases
+    let inside = false;
+    const x = point.x, y = point.y;
+    
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i].x, yi = polygon[i].y;
+        const xj = polygon[j].x, yj = polygon[j].y;
+        
+        // Check for exact matches to handle edge cases
+        if ((xi === x && yi === y) || (xj === x && yj === y)) {
+            return true; // Point is a vertex
+        }
+        
+        // Check if point is on the edge
+        if ((yi === y && yj === y) && // horizontal edge
+            ((xi <= x && x <= xj) || (xj <= x && x <= xi))) {
+            return true; // Point is on horizontal edge
+        }
+        
+        if ((xi === x && xj === x) && // vertical edge
+            ((yi <= y && y <= yj) || (yj <= y && y <= yi))) {
+            return true; // Point is on vertical edge
+        }
+        
+        // Standard ray-casting algorithm
+        const intersect = ((yi > y) !== (yj > y)) &&
+            (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        
+        if (intersect) inside = !inside;
+    }
+    
+    return inside;
+}
+
 // Improved function to create a shape from a subpath - handles both open and closed paths
 function createShapeFromSubPath(subPath) {
     if (!subPath || !subPath.curves || subPath.curves.length === 0) {
@@ -541,8 +2100,15 @@ function createShapeFromSubPath(subPath) {
         return null;
     }
     
-    // Log whether the path is closed or open
-    console.log(`Processing ${subPath.closed ? 'closed' : 'open'} subpath with ${subPath.curves.length} curves`);
+    // More detailed logging 
+    const isClosedPath = subPath.closed || 
+        (subPath.curves.length > 2 && 
+         distanceBetweenPoints(
+             getPointFromCurve(subPath.curves[0], 0),
+             getPointFromCurve(subPath.curves[subPath.curves.length-1], 1)
+         ) < 0.1);
+    
+    console.log(`Processing ${isClosedPath ? 'effectively closed' : 'open'} subpath with ${subPath.curves.length} curves`);
     
     // Start the shape
     shape.moveTo(startPoint.x, startPoint.y);
@@ -560,16 +2126,12 @@ function createShapeFromSubPath(subPath) {
         
         // If the distance between start and end is significant, connect them
         if (lastPoint && startPoint) {
-            const distance = Math.sqrt(
-                Math.pow(lastPoint.x - startPoint.x, 2) + 
-                Math.pow(lastPoint.y - startPoint.y, 2)
-            );
+            const distance = distanceBetweenPoints(lastPoint, startPoint);
             
             if (distance > 0.001) {
-                // For open paths, we have two options:
-                // 1. Connect the last point back to the first point
+                // Connect the last point back to the first point
                 shape.lineTo(startPoint.x, startPoint.y);
-                console.log(`Closed open path by connecting end back to start (distance: ${distance})`);
+                console.log(`Closed open path by connecting end to start (distance: ${distance.toFixed(3)})`);
             }
         }
     }
@@ -578,6 +2140,12 @@ function createShapeFromSubPath(subPath) {
     shape.closePath();
     
     return shape;
+}
+
+// Helper function to calculate distance between points
+function distanceBetweenPoints(p1, p2) {
+    if (!p1 || !p2) return Infinity;
+    return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
 }
 
 // Helper function to get a point from a curve at t parameter (improved to handle more curve types)
