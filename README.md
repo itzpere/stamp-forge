@@ -12,12 +12,12 @@ StampForge is an open-source tool for creating 3D models from SVG files, designe
 
 ## 🔴 Essential Downloads
 
-**[DOWNLOAD STAMP HOLDER](https://www.printables.com/model/stampforge-holder)** - This holder is required to use your created stamps
+**[DOWNLOAD STAMP HOLDER](https://www.printables.com/model/1285748-stampforge-customizable-svg-to-stamp)** - This holder is required to use your created stamps
 
 ## Features
 
 - Import SVG files and convert them to 3D models
-- Adjust extrusion height and scale
+- Adjust extrusion scale on working plane
 - Position the extrusion on the stamp base
 - View models in real-time 3D
 - Export models as STL files for 3D printing
@@ -27,7 +27,7 @@ StampForge is an open-source tool for creating 3D models from SVG files, designe
 
 1. Clone the repository:
    ```
-   git clone https://github.com/username/stamp-forge.git
+   git clone https://github.com/itzpere/stamp-forge.git
    cd stamp-forge
    ```
 
@@ -71,7 +71,7 @@ For best results when 3D printing your stamps:
 
 ## Additional Resources
 
-- [Printables Page](https://www.printables.com/model/stampforge) - See examples and share your prints
+- [Printables Page](https://www.printables.com/model/1285748-stampforge-customizable-svg-to-stamp) - See examples and share your prints
 - [Onshape Design](https://cad.onshape.com/documents/b8df565e3ee5bf1496f24090/w/ae81aeeee47b9edd37d47bd6/e/7bbac46e537c734a00283271?renderMode=0&uiState=6817b59c4f958a65368d6c7d) - View and modify the source CAD
 
 ## SVG Resources
@@ -97,10 +97,6 @@ If you encounter any issues or have questions, please reach out through:
 - **GitHub**: [Project Repository](https://github.com/itzpere/stamp-forge)
 - **Printables**: You can also contact me through Printables messages
 - **Bug Reports**: Please report any issues via email or GitHub
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 

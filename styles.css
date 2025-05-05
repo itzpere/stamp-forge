@@ -271,8 +271,94 @@ button:disabled {
   text-decoration: underline;
 }
 
+/* Quick Instructions - now below 3D viewer */
+.quick-instructions {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: var(--border-radius);
+  border-left: 4px solid #28a745;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+}
+
+.quick-instructions h3 {
+  font-size: 1.1rem;
+  margin-bottom: 0;
+  margin-right: 20px;
+  padding-bottom: 0;
+  border-bottom: none;
+  white-space: nowrap;
+}
+
+.quick-instructions ul {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quick-instructions li {
+  margin: 0 20px 0 0;
+  padding: 0;
+  font-size: 0.95rem;
+}
+
+/* Accordion Styles */
+.info-accordion {
+  margin: 30px 0;
+}
+
+.accordion-item {
+  margin-bottom: 15px;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.accordion-header {
+  background-color: var(--card-color);
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: var(--transition);
+  border-bottom: 1px solid #eee;
+}
+
+.accordion-header:hover {
+  background-color: #f5f5f7;
+}
+
+.accordion-header h3 {
+  margin: 0;
+  border: none;
+  padding: 0;
+}
+
+.accordion-icon {
+  font-size: 1.5rem;
+  color: var(--primary-color);
+  transition: transform 0.3s;
+}
+
+.accordion-header.active .accordion-icon {
+  transform: rotate(45deg);
+}
+
+.accordion-content {
+  background-color: var(--card-color);
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
 /* SVG Gallery Section */
 .svg-gallery-section {
+  margin-bottom: 30px;
   background-color: var(--card-color);
   border-radius: var(--border-radius);
   padding: 20px;
@@ -500,6 +586,237 @@ input[type="range"] {
     flex: 1;
 }
 
+/* Additional styles from inline styles */
+.alpha-badge {
+  background-color: #ff5722;
+  color: white;
+  font-size: 0.5em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  vertical-align: middle;
+  margin-left: 10px;
+}
+
+.warning-box {
+  background-color: #fff3cd;
+  border: 1px solid #ffeeba;
+  border-left: 5px solid #ff9800;
+  color: #856404;
+  padding: 10px;
+  margin: 15px 0;
+  border-radius: 4px;
+}
+
+.warning-text {
+  color: #721c24;
+  font-weight: bold;
+}
+
+.prominent-button {
+  display: block;
+  background-color: #28a745;
+  color: white;
+  text-align: center;
+  padding: 10px;
+  margin-bottom: 10px;
+  text-decoration: none;
+  border-radius: 4px;
+  font-weight: bold;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.prominent-button:hover {
+  background-color: #218838;
+}
+
+.prominent-link {
+  color: #28a745;
+  font-weight: bold;
+  text-decoration: underline;
+}
+
+.highlight-section {
+  border-left: 4px solid #28a745;
+  padding-left: 15px;
+}
+
+.highlight-item {
+  font-size: 1.1em;
+  margin-bottom: 8px;
+}
+
+.development-notice {
+  text-align: center;
+  background-color: #d4edda;
+  color: #155724;
+  padding: 10px;
+  margin-top: 20px;
+  border-radius: 4px;
+  font-style: italic;
+}
+
+.author-info {
+  margin-top: 10px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 5px;
+  border-left: 4px solid #007bff;
+}
+
+.author-info p {
+  margin: 5px 0;
+}
+
+.author-info a {
+  display: flex;
+  align-items: center;
+  color: #0366d6;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.author-info a:hover {
+  text-decoration: underline;
+}
+
+.github-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+}
+
+/* About & Resources section - Improved styling */
+.about-resources {
+  background-color: var(--card-color);
+  border-radius: var(--border-radius);
+  padding: 25px;
+  margin-bottom: 30px;
+  box-shadow: var(--shadow);
+}
+
+.about-resources h3 {
+  font-size: 1.8rem;
+  color: var(--primary-color);
+  padding-bottom: 15px;
+  margin-bottom: 25px;
+  border-bottom: 3px solid var(--primary-light);
+  text-align: center;
+}
+
+/* Info Grid Layout - Enhanced */
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 25px;
+}
+
+/* Enhanced info section styling */
+.info-section {
+  background-color: #fafafa;
+  border-radius: var(--border-radius);
+  padding: 20px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border-top: 4px solid var(--primary-light);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.info-section:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.info-section h4 {
+  color: var(--primary-color);
+  font-size: 1.3rem;
+  margin-top: 0;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #eee;
+  position: relative;
+}
+
+.info-section h4::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 40%;
+  height: 2px;
+  background-color: var(--primary-light);
+}
+
+.info-section p {
+  margin-bottom: 15px;
+  line-height: 1.6;
+}
+
+.info-section ul {
+  margin-left: 20px;
+  margin-bottom: 0;
+}
+
+.info-section li {
+  margin-bottom: 8px;
+  padding-left: 5px;
+}
+
+/* Custom styling for specific sections */
+.info-section.highlight-section {
+  border-top-color: #28a745;
+  background-color: #f8fff8;
+}
+
+.info-section.highlight-section h4 {
+  color: #28a745;
+}
+
+.info-section.highlight-section h4::after {
+  background-color: #28a745;
+}
+
+/* Author info section enhancements */
+.author-info {
+  margin-top: auto;
+  padding: 15px;
+  background-color: #f0f4f8;
+  border-radius: 8px;
+  border-left: 4px solid #007bff;
+}
+
+.author-info p {
+  margin: 5px 0;
+}
+
+.author-info a {
+  display: flex;
+  align-items: center;
+  color: #0366d6;
+  font-weight: bold;
+  text-decoration: none;
+  transition: color 0.2s;
+  padding: 5px 0;
+}
+
+.author-info a:hover {
+  color: #0056b3;
+}
+
+.github-icon {
+  width: 22px;
+  height: 22px;
+  margin-right: 10px;
+  transition: transform 0.2s;
+}
+
+.author-info a:hover .github-icon {
+  transform: scale(1.1);
+}
+
 /* Responsive adjustments */
 @media screen and (max-width: 900px) {
   .main-content {
@@ -508,6 +825,35 @@ input[type="range"] {
   
   #preview-container {
     height: 500px;
+  }
+  
+  .quick-instructions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .quick-instructions h3 {
+    margin-bottom: 10px;
+  }
+  
+  .quick-instructions ul {
+    flex-direction: column;
+  }
+  
+  .quick-instructions li {
+    margin: 5px 0;
+  }
+  
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .about-resources h3 {
+    font-size: 1.5rem;
+  }
+  
+  .info-section {
+    padding: 15px;
   }
 }
 
