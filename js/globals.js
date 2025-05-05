@@ -8,8 +8,8 @@ let triangleMesh, mirrorTriangleMesh;
 
 // Dimensions and properties (with defaults)
 const brickDimensions = { width: 20, height: 3, depth: 20 };
-let extrusionHeight = 1.2; // Default extrusion height in mm
-let extrusionPosition = { x: -10, y: 0.6, z: 10 }; // Position offset for extrusions
+let extrusionHeight = 3; // Default extrusion height in mm
+let extrusionPosition = { x: -10, y: 1.5, z: 10 }; // Position offset for extrusions
 let extrusionColor = 0x2a75f3;
 let brickColor = 0xbc8f8f;
 let triangleColor = 0xbc8f8f; // Default triangle color
