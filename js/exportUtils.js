@@ -54,6 +54,73 @@ function prepareExportGroup() {
         console.log("Added triangle 2 with baked transformations");
     }
     
+    // Add slot bricks with baked transformations
+    if (typeof slotGroup !== 'undefined' && slotGroup && slotGroup.children.length > 0) {
+        console.log(`Processing ${slotGroup.children.length} slot bricks for export...`);
+        
+        // Ensure matrix world is updated for all slot bricks
+        slotGroup.updateMatrixWorld(true);
+        
+        // Process each slot brick
+        slotGroup.children.forEach((slotBrick, index) => {
+            if (slotBrick.isMesh) {
+                try {
+                    // Clone the geometry
+                    const slotGeo = slotBrick.geometry.clone();
+                    
+                    // Apply world matrix directly to the vertices
+                    slotGeo.applyMatrix4(slotBrick.matrixWorld);
+                    
+                    // Create a new mesh with transformed geometry
+                    const slotMaterial = slotBrick.material.clone();
+                    const slotMeshClone = new THREE.Mesh(slotGeo, slotMaterial);
+                    
+                    // Reset transformations
+                    slotMeshClone.position.set(0, 0, 0);
+                    slotMeshClone.rotation.set(0, 0, 0);
+                    slotMeshClone.scale.set(1, 1, 1);
+                    
+                    // Add to export group
+                    exportGroup.add(slotMeshClone);
+                    console.log(`Added slot brick ${index+1} with baked transformations`);
+                } catch (err) {
+                    console.error(`Error processing slot brick ${index+1}:`, err);
+                }
+            }
+        });
+    } else {
+        console.warn("No slot bricks found to export. Attempting to re-create slot bricks...");
+        // Try to recreate slot bricks if they're missing
+        if (typeof addSlotBricks === 'function') {
+            addSlotBricks();
+            if (slotGroup && slotGroup.children.length > 0) {
+                console.log("Successfully recreated slot bricks, now adding to export...");
+                
+                slotGroup.updateMatrixWorld(true);
+                
+                slotGroup.children.forEach((slotBrick, index) => {
+                    if (slotBrick.isMesh) {
+                        try {
+                            const slotGeo = slotBrick.geometry.clone();
+                            slotGeo.applyMatrix4(slotBrick.matrixWorld);
+                            const slotMeshClone = new THREE.Mesh(
+                                slotGeo,
+                                slotBrick.material.clone()
+                            );
+                            slotMeshClone.position.set(0, 0, 0);
+                            slotMeshClone.rotation.set(0, 0, 0);
+                            slotMeshClone.scale.set(1, 1, 1);
+                            exportGroup.add(slotMeshClone);
+                            console.log(`Added recreated slot brick ${index+1}`);
+                        } catch (err) {
+                            console.error(`Error processing recreated slot brick ${index+1}:`, err);
+                        }
+                    }
+                });
+            }
+        }
+    }
+    
     // Add extrusions - THIS IS THE CRITICAL PART
     if (extrudedGroup && extrudedGroup.children.length > 0) {
         console.log(`Processing ${extrudedGroup.children.length} extrusions for export...`);

@@ -6,8 +6,10 @@ function createBrick() {
         // Also remove associated triangles
         if (triangleMesh) scene.remove(triangleMesh);
         if (mirrorTriangleMesh) scene.remove(mirrorTriangleMesh);
+        if (slotMesh) scene.remove(slotMesh);
         triangleMesh = null;
         mirrorTriangleMesh = null;
+        slotMesh = null;
     }
     
     // Remove existing extrusions if they exist
@@ -28,10 +30,11 @@ function createBrick() {
         new THREE.MeshStandardMaterial({ color: brickColor, name: 'back' })
     ];
     
-    // Create brick geometry (uses default brickDimensions)
+    // Adjust brick height and position
+    const reducedHeight = brickDimensions.height - 0.6; // Reduce height by slot height
     const geometry = new THREE.BoxGeometry(
         brickDimensions.width,
-        brickDimensions.height,
+        reducedHeight,
         brickDimensions.depth
     );
     
@@ -40,13 +43,16 @@ function createBrick() {
     brick.castShadow = true;
     brick.receiveShadow = true;
     
-    // Position the brick so its bottom face sits exactly on the plane (y=0)
-    brick.position.y = brickDimensions.height / 2;
+    // Position the brick so its bottom face sits exactly above the slot bricks
+    brick.position.y = reducedHeight / 2 + 0.6; // Move up by slot height
     
     scene.add(brick);
     
     // Add the 90-degree triangles to the sides of the brick
-    addTriangleToBrick(); // This function now adds both triangles
+    addTriangleToBrick();
+    
+    // Add the slot bricks at the bottom
+    addSlotBricks();
 }
 
 // Function to add 90-degree triangles to both sides of the brick
@@ -126,6 +132,161 @@ function addTriangleToBrick() {
     scene.add(mirrorTriangleMesh);
 }
 
+// Function to add slot bricks at the bottom of the brick
+function addSlotBricks() {
+    const slotBrickHeight = 0.7; // Slot height
+    const slotBrickWidth = 10; // Slot width
+    const slotBrickDepth = 9; // Slot depth
+
+    const smallBrickMaterial = new THREE.MeshStandardMaterial({
+        color: brickColor,
+        side: THREE.DoubleSide
+    });
+
+    // Create a new group for slot bricks
+    if (typeof slotGroup === 'undefined' || !slotGroup) {
+        slotGroup = new THREE.Group();
+        slotGroup.name = "slotGroup"; // Add a name for easier debugging
+        scene.add(slotGroup);
+    }
+
+    // Clear existing slot bricks from the group
+    while (slotGroup.children.length > 0) {
+        slotGroup.remove(slotGroup.children[0]);
+    }
+
+    // Create left and right slot bricks
+    const leftRightBrickWidth = (brickDimensions.width - slotBrickWidth) / 2;
+    const leftRightBrickGeometry = new THREE.BoxGeometry(leftRightBrickWidth, slotBrickHeight, brickDimensions.depth);
+
+    const leftBrick = new THREE.Mesh(leftRightBrickGeometry, smallBrickMaterial);
+    leftBrick.position.set(
+        -(slotBrickWidth / 2 + leftRightBrickWidth / 2), 
+        -(brickDimensions.height / 2 - slotBrickHeight / 2) + 1.5, // Move up by 1 mm
+        0
+    );
+    slotGroup.add(leftBrick);
+
+    const rightBrick = new THREE.Mesh(leftRightBrickGeometry, smallBrickMaterial);
+    rightBrick.position.set(
+        slotBrickWidth / 2 + leftRightBrickWidth / 2, 
+        -(brickDimensions.height / 2 - slotBrickHeight / 2) + 1.5, // Move up by 1 mm
+        0
+    );
+    slotGroup.add(rightBrick);
+
+    // Create front and back slot bricks
+    const frontBackBrickDepth = (brickDimensions.depth - slotBrickDepth) / 2;
+    const frontBackBrickGeometry = new THREE.BoxGeometry(slotBrickWidth, slotBrickHeight, frontBackBrickDepth);
+
+    const frontBrick = new THREE.Mesh(frontBackBrickGeometry, smallBrickMaterial);
+    frontBrick.position.set(
+        0, 
+        -(brickDimensions.height / 2 - slotBrickHeight / 2) + 1.5, // Move up by 1 mm
+        -(slotBrickDepth / 2 + frontBackBrickDepth / 2)
+    );
+    slotGroup.add(frontBrick);
+
+    const backBrick = new THREE.Mesh(frontBackBrickGeometry, smallBrickMaterial);
+    backBrick.position.set(
+        0, 
+        -(brickDimensions.height / 2 - slotBrickHeight / 2) + 1.5, // Move up by 1 mm
+        slotBrickDepth / 2 + frontBackBrickDepth / 2
+    );
+    slotGroup.add(backBrick);
+
+    console.log("Slot bricks added visually and included in the slot group.");
+}
+
+// Create a custom geometry for a brick with a slot cut out of the bottom
+function createBrickWithSlotGeometry(width, height, depth, slotWidth, slotHeight, slotDepth) {
+    // Skip trying to use ThreeCSG since it's undefined in the global scope
+    // Directly create a custom brick geometry with the slot manually defined
+    return createCustomBrickWithSlotGeometry(width, height, depth, slotWidth, slotHeight, slotDepth);
+}
+
+// Helper function to create a custom brick geometry with a slot manually defined
+function createCustomBrickWithSlotGeometry(width, height, depth, slotWidth, slotHeight, slotDepth) {
+    // Create a BufferGeometry
+    const geometry = new THREE.BufferGeometry();
+    
+    // Half dimensions for convenience
+    const hw = width / 2, hh = height / 2, hd = depth / 2;
+    const shw = slotWidth / 2, shh = slotHeight / 2, shd = slotDepth / 2;
+    
+    // Ensure the slot doesn't exceed the brick dimensions
+    const actualShw = Math.min(shw, hw);
+    const actualShd = Math.min(shd, hd);
+    
+    // Calculate the corners of the brick and the slot
+    const vertices = [
+        // Brick vertices - bottom layer
+        -hw, -hh, -hd,  // 0: bottom-left-back
+        hw, -hh, -hd,   // 1: bottom-right-back
+        hw, -hh, hd,    // 2: bottom-right-front
+        -hw, -hh, hd,   // 3: bottom-left-front
+        
+        // Brick vertices - top layer
+        -hw, hh, -hd,   // 4: top-left-back
+        hw, hh, -hd,    // 5: top-right-back
+        hw, hh, hd,     // 6: top-right-front
+        -hw, hh, hd,    // 7: top-left-front
+        
+        // Slot vertices - top layer (y = -hh + slotHeight)
+        -actualShw, -hh + slotHeight, -actualShd, // 8: slot-top-left-back
+        actualShw, -hh + slotHeight, -actualShd,  // 9: slot-top-right-back
+        actualShw, -hh + slotHeight, actualShd,   // 10: slot-top-right-front
+        -actualShw, -hh + slotHeight, actualShd,  // 11: slot-top-left-front
+        
+        // Slot vertices - bottom layer (y = -hh)
+        -actualShw, -hh, -actualShd, // 12: slot-bottom-left-back
+        actualShw, -hh, -actualShd,  // 13: slot-bottom-right-back
+        actualShw, -hh, actualShd,   // 14: slot-bottom-right-front
+        -actualShw, -hh, actualShd   // 15: slot-bottom-left-front
+    ];
+    
+    // Define faces (triangles)
+    const indices = [
+        // Top face
+        4, 5, 6, 4, 6, 7,
+        
+        // Side faces
+        0, 4, 7, 0, 7, 3, // Left
+        1, 2, 6, 1, 6, 5, // Right
+        0, 1, 5, 0, 5, 4, // Back
+        3, 7, 6, 3, 6, 2, // Front
+        
+        // Bottom face with cutout
+        // Left of slot
+        0, 3, 15, 0, 15, 12,
+        // Right of slot
+        1, 13, 14, 1, 14, 2,
+        // Front of slot
+        3, 2, 14, 3, 14, 15,
+        // Back of slot
+        0, 12, 13, 0, 13, 1,
+        
+        // Slot inner faces
+        // Slot top face
+        8, 10, 9, 8, 11, 10,
+        // Slot left face
+        8, 12, 15, 8, 15, 11,
+        // Slot right face
+        9, 10, 14, 9, 14, 13,
+        // Slot front face
+        11, 15, 14, 11, 14, 10,
+        // Slot back face
+        8, 9, 13, 8, 13, 12
+    ];
+    
+    // Set attributes
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    
+    return geometry;
+}
+
 // Helper function to create and position extruded shapes with quality option
 function createExtrudedShape(shape, scale, lowQuality = false) {
     // Higher quality settings for export
@@ -203,6 +364,8 @@ function updateExtrusionPosition() {
             parseSVGForExtrusion(lastSvgData, false, maxInteractiveQuality);
         }
     }
+
+    // Ensure slot bricks remain static (no updates here)
 }
 
 // Optimized position update
@@ -227,8 +390,72 @@ function optimizedPositionUpdate() {
                     extrusionPosition.z
                 );
             });
+
+            // Ensure slot bricks remain static (no updates here)
         });
     } else {
         scheduleProgressiveRendering();
     }
+}
+
+// Ensure slotGroup is initialized globally and is accessible
+let slotGroup; // Moved to ensure it's properly declared
+
+// Export STL function
+function exportSTL() {
+    const exporter = new THREE.STLExporter();
+    const combinedGroup = new THREE.Group();
+
+    // Count objects for logging
+    let objectCount = 0;
+    
+    // Add the brick with error checking
+    if (brick) {
+        combinedGroup.add(brick.clone());
+        objectCount++;
+        console.log("Added brick to export");
+    }
+    
+    // Add triangles with error checking
+    if (triangleMesh) {
+        combinedGroup.add(triangleMesh.clone());
+        objectCount++;
+        console.log("Added triangle mesh to export");
+    }
+    
+    if (mirrorTriangleMesh) {
+        combinedGroup.add(mirrorTriangleMesh.clone());
+        objectCount++;
+        console.log("Added mirror triangle mesh to export");
+    }
+    
+    // Add extruded group with error checking
+    if (extrudedGroup && extrudedGroup.children.length > 0) {
+        combinedGroup.add(extrudedGroup.clone());
+        objectCount += extrudedGroup.children.length;
+        console.log(`Added extruded group with ${extrudedGroup.children.length} children to export`);
+    }
+    
+    // Add slot group with better error checking
+    if (slotGroup && slotGroup.children.length > 0) {
+        // Clone the slot group to avoid modifying the original
+        const slotGroupClone = slotGroup.clone();
+        combinedGroup.add(slotGroupClone);
+        objectCount += slotGroup.children.length;
+        console.log(`Added slot group with ${slotGroup.children.length} children to export`);
+    } else {
+        console.warn("Slot group is missing or empty - recreating slots for export");
+        // Recreate slot bricks if missing
+        addSlotBricks();
+        if (slotGroup && slotGroup.children.length > 0) {
+            combinedGroup.add(slotGroup.clone());
+            objectCount += slotGroup.children.length;
+            console.log(`Added newly created slot group with ${slotGroup.children.length} children to export`);
+        }
+    }
+
+    console.log(`Exporting ${objectCount} total objects (in ${combinedGroup.children.length} groups) to STL`);
+
+    const stlString = exporter.parse(combinedGroup);
+    downloadSTL(stlString, 'brick.stl');
 }
