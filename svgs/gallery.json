@@ -1,6 +1,11 @@
 {
   "images": [
     {
+      "name": "achievement-award-trophy-svgrepo-com.svg",
+      "path": "svgs/achievement-award-trophy-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
       "name": "alien-svgrepo-com.svg",
       "path": "svgs/alien-svgrepo-com.svg",
       "thumbnail": null
@@ -13,6 +18,11 @@
     {
       "name": "arcane-mask-svgrepo-com.svg",
       "path": "svgs/arcane-mask-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "art-artist-craft-canvas-svgrepo-com.svg",
+      "path": "svgs/art-artist-craft-canvas-svgrepo-com.svg",
       "thumbnail": null
     },
     {
@@ -46,8 +56,28 @@
       "thumbnail": null
     },
     {
+      "name": "bolt-svgrepo-com.svg",
+      "path": "svgs/bolt-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "bomb-svgrepo-com.svg",
+      "path": "svgs/bomb-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "bone-svgrepo-com.svg",
+      "path": "svgs/bone-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
       "name": "bonfire-3-svgrepo-com.svg",
       "path": "svgs/bonfire-3-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "bowl-svgrepo-com.svg",
+      "path": "svgs/bowl-svgrepo-com.svg",
       "thumbnail": null
     },
     {
@@ -56,8 +86,33 @@
       "thumbnail": null
     },
     {
+      "name": "bullhorn-svgrepo-com.svg",
+      "path": "svgs/bullhorn-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "bus-svgrepo-com.svg",
+      "path": "svgs/bus-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
       "name": "camera-photo-heart-svgrepo-com.svg",
       "path": "svgs/camera-photo-heart-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "cancer-svgrepo-com.svg",
+      "path": "svgs/cancer-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "casino-gamble-gambling-svgrepo-com.svg",
+      "path": "svgs/casino-gamble-gambling-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "castle-svgrepo-com.svg",
+      "path": "svgs/castle-svgrepo-com.svg",
       "thumbnail": null
     },
     {
@@ -73,6 +128,26 @@
     {
       "name": "checkmark-svgrepo-com(1).svg",
       "path": "svgs/checkmark-svgrepo-com(1).svg",
+      "thumbnail": null
+    },
+    {
+      "name": "checkmark-svgrepo-com(2).svg",
+      "path": "svgs/checkmark-svgrepo-com(2).svg",
+      "thumbnail": null
+    },
+    {
+      "name": "cherries-cherry-fruit-svgrepo-com.svg",
+      "path": "svgs/cherries-cherry-fruit-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "chess-queen-svgrepo-com.svg",
+      "path": "svgs/chess-queen-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "chess-rook-svgrepo-com.svg",
+      "path": "svgs/chess-rook-svgrepo-com.svg",
       "thumbnail": null
     },
     {
@@ -101,8 +176,48 @@
       "thumbnail": null
     },
     {
+      "name": "duck-svgrepo-com.svg",
+      "path": "svgs/duck-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
       "name": "earth-11-svgrepo-com.svg",
       "path": "svgs/earth-11-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "emo-devil-svgrepo-com.svg",
+      "path": "svgs/emo-devil-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "emo-squint-svgrepo-com.svg",
+      "path": "svgs/emo-squint-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "emo-sunglasses-svgrepo-com.svg",
+      "path": "svgs/emo-sunglasses-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "emo-thumbsup-svgrepo-com.svg",
+      "path": "svgs/emo-thumbsup-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "emo-tongue-svgrepo-com.svg",
+      "path": "svgs/emo-tongue-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "emo-wink-svgrepo-com.svg",
+      "path": "svgs/emo-wink-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "emo-wink2-svgrepo-com.svg",
+      "path": "svgs/emo-wink2-svgrepo-com.svg",
       "thumbnail": null
     },
     {
@@ -116,6 +231,16 @@
       "thumbnail": null
     },
     {
+      "name": "fragaria-fruit-strawberry-svgrepo-com.svg",
+      "path": "svgs/fragaria-fruit-strawberry-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "fruit-grape-grapes-svgrepo-com.svg",
+      "path": "svgs/fruit-grape-grapes-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
       "name": "game-controller-svgrepo-com.svg",
       "path": "svgs/game-controller-svgrepo-com.svg",
       "thumbnail": null
@@ -123,6 +248,11 @@
     {
       "name": "gem-svgrepo-com.svg",
       "path": "svgs/gem-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "halloween-bat-animal-svgrepo-com.svg",
+      "path": "svgs/halloween-bat-animal-svgrepo-com.svg",
       "thumbnail": null
     },
     {
@@ -201,6 +331,26 @@
       "thumbnail": null
     },
     {
+      "name": "smile-svgrepo-com(1).svg",
+      "path": "svgs/smile-svgrepo-com(1).svg",
+      "thumbnail": null
+    },
+    {
+      "name": "smile-svgrepo-com(2).svg",
+      "path": "svgs/smile-svgrepo-com(2).svg",
+      "thumbnail": null
+    },
+    {
+      "name": "smile-svgrepo-com.svg",
+      "path": "svgs/smile-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
+      "name": "smile-wink-svgrepo-com.svg",
+      "path": "svgs/smile-wink-svgrepo-com.svg",
+      "thumbnail": null
+    },
+    {
       "name": "swan-love-heart-svgrepo-com.svg",
       "path": "svgs/swan-love-heart-svgrepo-com.svg",
       "thumbnail": null
@@ -221,5 +371,5 @@
       "thumbnail": null
     }
   ],
-  "lastUpdated": "2025-05-05T17:26:34.163Z"
+  "lastUpdated": "2025-05-13T12:40:32.104Z"
 }
