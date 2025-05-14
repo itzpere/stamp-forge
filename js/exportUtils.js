@@ -40,32 +40,42 @@ function prepareExportGroup() {
         console.log(`Added ${exportGroup.children.length - (stampBase ? 1 : 0)} extrusion shapes to export group`);
     }
 
-    if (triangleMesh && triangleMesh.visible) {
+    // Check if triangleMesh and triangleColor are defined before trying to use them
+    if (typeof triangleMesh !== 'undefined' && triangleMesh && triangleMesh.visible) {
+        const defaultColor = 0xbc8f8f;
+        const meshColor = (typeof triangleColor !== 'undefined') ? triangleColor : defaultColor;
+        
         const triangleGeo = triangleMesh.geometry.clone();
         triangleGeo.applyMatrix4(triangleMesh.matrixWorld);
         
         const triangleMaterial = new THREE.MeshStandardMaterial({
-            color: triangleColor || 0xbc8f8f,
+            color: meshColor,
             roughness: 0.5,
             metalness: 0.2
         });
         
         const triangleMeshForExport = new THREE.Mesh(triangleGeo, triangleMaterial);
         exportGroup.add(triangleMeshForExport);
+        console.log("Added triangle mesh to export group");
     }
     
-    if (mirrorTriangleMesh && mirrorTriangleMesh.visible) {
+    // Similarly check for mirrorTriangleMesh
+    if (typeof mirrorTriangleMesh !== 'undefined' && mirrorTriangleMesh && mirrorTriangleMesh.visible) {
+        const defaultColor = 0xbc8f8f;
+        const meshColor = (typeof triangleColor !== 'undefined') ? triangleColor : defaultColor;
+        
         const mirrorGeo = mirrorTriangleMesh.geometry.clone();
         mirrorGeo.applyMatrix4(mirrorTriangleMesh.matrixWorld);
         
         const mirrorMaterial = new THREE.MeshStandardMaterial({
-            color: triangleColor || 0xbc8f8f,
+            color: meshColor,
             roughness: 0.5,
             metalness: 0.2
         });
         
         const mirrorMeshForExport = new THREE.Mesh(mirrorGeo, mirrorMaterial);
         exportGroup.add(mirrorMeshForExport);
+        console.log("Added mirror triangle mesh to export group");
     }
     
     if (typeof slotGroup !== 'undefined' && slotGroup && slotGroup.children.length > 0) {
@@ -87,17 +97,17 @@ function prepareExportGroup() {
         });
     }
     
+    // Create a rotation matrix for 90 degrees around X axis
+    const rotationMatrix = new THREE.Matrix4().makeRotationX(Math.PI/2);
+    
     exportGroup.children.forEach(child => {
         if (child.isMesh && child.geometry) {
-            const rotationMatrix = new THREE.Matrix4().makeRotationX(Math.PI / 2);
+            // Apply rotation directly to the geometry
             child.geometry.applyMatrix4(rotationMatrix);
-            child.position.set(0, 0, 0);
-            child.rotation.set(0, 0, 0);
-            child.scale.set(1, 1, 1);
         }
     });
     
-    console.log(`Export group prepared with ${exportGroup.children.length} meshes`);
+    console.log(`Export group prepared with ${exportGroup.children.length} meshes (rotated 90° for printing)`);
     return exportGroup;
 }
 
@@ -107,10 +117,17 @@ function exportSTL() {
         loadingElement.classList.remove('hidden');
         loadingElement.textContent = 'Preparing model for export...';
         
+        // Store original position values to restore later
+        const originalPosition = {
+            x: extrusionPosition.x,
+            y: extrusionPosition.y,
+            z: extrusionPosition.z
+        };
+        
         isHighQualityMode = true;
         
         setTimeout(() => {
-            if (lastSvgData) {
+            if (typeof lastSvgData !== 'undefined' && lastSvgData) {
                 try {
                     while(extrudedGroup && extrudedGroup.children.length > 0) {
                         const child = extrudedGroup.children[0];
@@ -125,9 +142,10 @@ function exportSTL() {
                         }
                     }
                     
-                    extrusionPosition.x = parseFloat(document.getElementById('extrusionX').value) || 0;
-                    extrusionPosition.y = parseFloat(document.getElementById('extrusionY').value) || 0;
-                    extrusionPosition.z = parseFloat(document.getElementById('extrusionZ').value) || 0;
+                    // Always use the original position values, not the UI values which might have changed
+                    extrusionPosition.x = originalPosition.x;
+                    extrusionPosition.y = originalPosition.y;
+                    extrusionPosition.z = originalPosition.z;
                     
                     parseSVGForExtrusion(lastSvgData, false, 1.0, true);
                     
@@ -144,7 +162,8 @@ function exportSTL() {
                             const exporter = new THREE.STLExporter();
                             const result = exporter.parse(exportGroup, { binary: true });
                             
-                            const sanitizedName = currentSvgFilename.replace(/[^\w\-\.]/g, '_') || 'stampforge';
+                            const sanitizedName = typeof currentSvgFilename !== 'undefined' ? 
+                                currentSvgFilename.replace(/[^\w\-\.]/g, '_') : 'stampforge';
                             const filename = `stampForge_${sanitizedName}.stl`;
                             
                             const blob = new Blob([result], { type: 'application/octet-stream' });
@@ -160,7 +179,12 @@ function exportSTL() {
                                 if (link.parentNode) link.parentNode.removeChild(link);
                                 
                                 isHighQualityMode = false;
-                                if (lastSvgData) {
+                                if (typeof lastSvgData !== 'undefined' && lastSvgData) {
+                                    // Restore original position before re-rendering
+                                    extrusionPosition.x = originalPosition.x;
+                                    extrusionPosition.y = originalPosition.y;
+                                    extrusionPosition.z = originalPosition.z;
+                                    
                                     setTimeout(() => parseSVGForExtrusion(lastSvgData, false, maxInteractiveQuality), 200);
                                 }
                                 
@@ -181,6 +205,10 @@ function exportSTL() {
                     isHighQualityMode = false;
                     loadingElement.textContent = 'Loading...';
                     loadingElement.classList.add('hidden');
+                    // Reset back to original position
+                    extrusionPosition.x = originalPosition.x;
+                    extrusionPosition.y = originalPosition.y;
+                    extrusionPosition.z = originalPosition.z;
                 }
             } else {
                 try {

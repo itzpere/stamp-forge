@@ -390,6 +390,7 @@ function updateMeshAppearanceForOperation(mesh, operationType) {
 
     switch (operationType) {
         case 'remove':
+        case 'subtract': // Add 'subtract' as alias for 'remove'
             // This shape is identified as a hole that should be subtracted.
             // "removed or subtracted ... instead of extruded" means it shouldn't appear as a positive extrusion.
             // Making it invisible is a way of "removing" it from the visual output.
@@ -397,6 +398,8 @@ function updateMeshAppearanceForOperation(mesh, operationType) {
             // Reset material to a default state as it's not visible.
             if (mesh.material.userData.originalColor) {
                 mesh.material.color.copy(mesh.material.userData.originalColor);
+                // Add a subtle blue tint to indicate it's a subtraction
+                mesh.material.color.offsetHSL(0.6, 0, 0); // Shift to blue hue
             }
             mesh.material.wireframe = false;
             mesh.material.transparent = false;
@@ -404,7 +407,7 @@ function updateMeshAppearanceForOperation(mesh, operationType) {
             mesh.material.depthWrite = true; 
             mesh.material.side = THREE.FrontSide; 
 
-            console.warn(`Shape ${mesh.userData.shapeId} (operation: 'remove') is now hidden. True subtraction requires CSG operations.`);
+            console.warn(`Shape ${mesh.userData.shapeId} (operation: '${operationType}') is now hidden. True subtraction requires CSG operations.`);
             break;
             
         case 'disable':
@@ -414,7 +417,7 @@ function updateMeshAppearanceForOperation(mesh, operationType) {
             mesh.material.opacity = extrudeConfig.disabledOpacity; 
             mesh.material.depthWrite = true; 
             mesh.material.side = THREE.FrontSide;
-            mesh.visible = false; // Explicitly hide disabled shapes
+            mesh.visible = false;
             break;
             
         case 'extrude':

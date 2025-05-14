@@ -12,6 +12,23 @@ async function init() {
             }];
         }
 
+        // Ensure all necessary global variables are initialized from config
+        window.svgScaleFactor = window.StampForgeConfig ? window.StampForgeConfig.svg.scale : 1.0;
+        window.extrusionPosition = window.StampForgeConfig && window.StampForgeConfig.extrusion ? 
+            window.StampForgeConfig.extrusion.position : { x: 0, y: 0, z: 0 };
+        window.autoSetYOffset = window.StampForgeConfig && window.StampForgeConfig.extrusion ? 
+            window.StampForgeConfig.extrusion.autoSetYOffset : true;
+        window.extrusionHeight = window.StampForgeConfig && window.StampForgeConfig.extrusion ? 
+            window.StampForgeConfig.extrusion.height : 1.5;
+            
+        // Log initialized SVG properties for debugging
+        console.log("SVG Properties initialized:", {
+            svgScaleFactor: window.svgScaleFactor,
+            extrusionPosition: window.extrusionPosition,
+            autoSetYOffset: window.autoSetYOffset,
+            extrusionHeight: window.extrusionHeight
+        });
+        
         initScene();
         
         // Initialize extrudedGroup for SVG extrusions and assign to window
@@ -22,7 +39,8 @@ async function init() {
             console.error("Scene not initialized before adding extrudedGroup.");
         }
         
-        camera.position.set(0, 20, 30);
+        // Set initial camera position with 180-degree rotation (negative Z)
+        camera.position.set(0, 20, -30);
         camera.lookAt(0, 0, 0);
         controls.update();
         
@@ -46,7 +64,7 @@ async function init() {
         const resetViewElement = document.getElementById('resetView');
         if (resetViewElement) {
             resetViewElement.addEventListener('click', function() {
-                camera.position.set(0, 20, 30);
+                camera.position.set(0, 20, -30);
                 camera.lookAt(0, 0, 0);
                 controls.update();
             });

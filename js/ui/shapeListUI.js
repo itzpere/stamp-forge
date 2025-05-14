@@ -160,30 +160,6 @@ function populateShapeList() {
         
         advancedControlsContainer.appendChild(positionControlsContainer);
 
-        const windingToggleButton = document.createElement('button');
-        windingToggleButton.className = 'shape-winding-toggle';
-        windingToggleButton.textContent = shapeInfo.useReversedWinding ? 'CCW ↔' : 'CW ↔';
-        windingToggleButton.title = shapeInfo.useReversedWinding ? 
-            "Currently using reversed winding (CW exteriors). Click to switch to CCW exteriors." : 
-            "Currently using standard winding (CCW exteriors). Click to switch to CW exteriors.";
-        
-        windingToggleButton.addEventListener('click', () => {
-            shapeInfo.useReversedWinding = !shapeInfo.useReversedWinding;
-            windingToggleButton.textContent = shapeInfo.useReversedWinding ? 'CCW ↔' : 'CW ↔';
-            windingToggleButton.title = shapeInfo.useReversedWinding ? 
-                "Currently using reversed winding (CW exteriors). Click to switch to CCW exteriors." : 
-                "Currently using standard winding (CCW exteriors). Click to switch to CW exteriors.";
-            
-            regenerateShape(shapeInfo);
-        });
-
-        const windingLabel = document.createElement('span');
-        windingLabel.textContent = "Winding: ";
-        windingLabel.className = 'shape-control-label';
-
-        advancedControlsContainer.appendChild(windingLabel);
-        advancedControlsContainer.appendChild(windingToggleButton);
-
         listItem.appendChild(mainControlsContainer);
         listItem.appendChild(advancedControlsContainer);
         shapeListContent.appendChild(listItem);
@@ -256,6 +232,11 @@ function regenerateShape(shapeInfo) {
     }
     
     if (typeof regenerateShapeWithWinding === 'function') {
+        // Remove winding property before regeneration
+        if (shapeInfo.useReversedWinding !== undefined) {
+            delete shapeInfo.useReversedWinding;
+        }
+        
         regenerateShapeWithWinding(shapeInfo);
     } else {
         parseSVGForExtrusion(window.lastSvgData, false, window.maxInteractiveQuality);

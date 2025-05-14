@@ -2,17 +2,24 @@
 
 /* Base styles and variables */
 :root {
-  --primary-color: #3f51b5;
-  --primary-light: #757de8;
-  --primary-dark: #002984;
-  --secondary-color: #ff4081;
-  --background-color: #f5f5f7;
+  --primary-color: #4a6da7;
+  --primary-light: #7b97c9;
+  --primary-dark: #2d4b7a;
+  --secondary-color: #ff6b6b;
+  --background-color: #f8f9fa;
   --card-color: #ffffff;
-  --text-primary: #212121;
-  --text-secondary: #757575;
-  --border-radius: 8px;
-  --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --text-primary: #2c3e50;
+  --text-secondary: #566573;
+  --border-radius: 10px;
+  --shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
   --transition: all 0.3s ease;
+  --accent-color: #f39c12;
+  --success-color: #27ae60;
+  --danger-color: #e74c3c;
+  --header-font: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --body-font: 'Open Sans', 'Helvetica Neue', Arial, sans-serif;
+  --overlay-background: rgba(0, 0, 0, 0.7);
+  --loading-z-index: 50;
 }
 
 * {
@@ -23,9 +30,9 @@
 
 /* General body and HTML styling */
 html, body {
-    font-family: 'Arial', sans-serif;
-    background-color: #f4f4f4;
-    color: #333;
+    font-family: var(--body-font);
+    background-color: var(--background-color);
+    color: var(--text-primary);
     margin: 0;
     padding: 0;
     line-height: 1.6;
@@ -33,68 +40,88 @@ html, body {
 
 body {
   padding: 20px;
+  background-image: linear-gradient(to bottom, #f8f9fa, #edf2f7);
+  min-height: 100vh;
 }
 
 h1, h2, h3, h4 {
+  font-family: var(--header-font);
   color: var(--primary-dark);
   margin-bottom: 16px;
+  font-weight: 600;
 }
 
 h1 {
-  font-size: 4rem;
+  font-size: 3.5rem;
   text-align: center;
-  margin: 20px 0 30px;
+  margin: 4px 0 34px;
   color: var(--primary-color);
+  letter-spacing: -0.5px;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.05);
 }
 
 h3 {
-  font-size: 1.4rem;
-  margin-bottom: 15px;
+  font-size: 1.5rem;
+  margin-bottom: 18px;
   border-bottom: 2px solid var(--primary-light);
-  padding-bottom: 8px;
+  padding-bottom: 10px;
+  color: var(--primary-dark);
 }
 
 .container {
-    width: 90%; /* REVERTED from 100% */
-    max-width: 1400px; /* Increased from previous value */
     margin: 0 auto;
-    padding: 1rem;
-    background-color: #fff;
-    box-shadow: 0 0 15px rgba(0,0,0,0.1);
-    border-radius: 8px;
+    padding: 1.5rem;
+    background-color: var(--card-color);
+    box-shadow: 0 0 25px rgba(0,0,0,0.06);
+    border-radius: var(--border-radius);
 }
 
 .alpha-badge {
   font-size: 0.5em;
-  background-color: #e74c3c;
+  background-color: var(--danger-color);
   color: white;
-  padding: 3px 8px;
-  border-radius: 3px;
+  padding: 4px 10px;
+  border-radius: 4px;
   vertical-align: middle;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.1);
 }
 
 /* Full-width viewer styles - INCREASED HEIGHT */
 .full-width-viewer {
     width: 100%;
     height: auto;
-    margin-bottom: 1.5rem;
+    margin-bottom: 2rem;
 }
 
+/* 3D Viewer Container Styles */
 #preview-container {
     position: relative;
-    height: 400px; /* Match three-container height */
-    width: 100%;
-    border-radius: 8px;
+    width: 96%;
+    max-width: 1300px;
+    height: 0;
+    padding-bottom: 55%;
+    margin: 0 auto;
+    background-color: #eef2f7;
     overflow: hidden;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    border-radius: var(--border-radius);
+}
+
+/* Grid styles for XY ground plane */
+.grid-xy {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
 }
 
 #three-container {
-  width: 100%;
-  height: 400px; /* Reduced height */
-  position: relative;
-  overflow: hidden;
-  border-radius: 8px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
 }
 
 #loading {
@@ -102,12 +129,52 @@ h3 {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background-color: rgba(0, 0, 0, 0.7);
+    background-color: var(--overlay-background);
     color: white;
-    padding: 15px 25px;
-    border-radius: 8px;
-    z-index: 100; /* Ensure loading is on top */
-    font-size: 1.1em;
+    padding: 12px 24px;
+    border-radius: 6px;
+    z-index: var(--loading-z-index);
+    font-weight: bold;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    text-align: center;
+    min-width: 180px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    opacity: 1;
+    visibility: visible;
+}
+
+#loading::after {
+    content: "";
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-left: 10px;
+    border: 2px solid white;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: loading-spinner 1s linear infinite;
+    vertical-align: middle;
+}
+
+@keyframes loading-spinner {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Improved hidden class to properly hide elements */
+.hidden {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+/* Ensure loading is properly hidden when not needed */
+#preview-container.loading-complete #loading {
+    opacity: 0;
+    visibility: hidden;
 }
 
 /* Styles for the main container of viewer and potentially other elements */
@@ -117,44 +184,42 @@ h3 {
     width: 100%;
     height: auto;
     min-height: 400px;
-    margin-bottom: 1.5rem;
+    margin-bottom: 2rem;
 }
 
-
 .shape-list-panel {
-    position: absolute; /* Position it over the viewer */
-    top: 10px;
-    right: 10px;
-    width: 280px; /* Adjust width as needed for an overlay */
-    max-height: 300px; /* Max height relative to viewer, with padding */
-    background-color: rgba(249, 249, 249, 0.9); /* Semi-transparent background */
-    border: 1px solid #ccc; /* Unified border */
-    border-radius: 5px;
-    padding: 10px;
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 230px;
+    max-height: calc(100% - 24px);
+    background-color: rgba(255, 255, 255, 0.97);
+    border-radius: var(--border-radius);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.1);
+    padding: 14px;
     overflow-y: auto;
-    z-index: 10; /* Ensure it's above the three-container canvas */
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* Optional: add some shadow */
-    /* Removed border-left as it's now a floating panel */
+    z-index: 5;
+    font-size: 0.9rem;
+    border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .shape-list-panel h3 {
     margin-top: 0;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
     font-size: 1.1em;
-    color: #333;
-    padding-bottom: 5px;
-    border-bottom: 1px solid #ddd;
+    color: var(--primary-dark);
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 /* Instructions and info sections */
 .instructions, .more-info {
   background-color: var(--card-color);
   border-radius: var(--border-radius);
-  padding: 20px;
+  padding: 25px;
   margin-bottom: 30px;
   box-shadow: var(--shadow);
+  border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .instructions ul, .more-info ul {
@@ -162,11 +227,11 @@ h3 {
 }
 
 .instructions li, .more-info li {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .info-section {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .info-section:last-child {
@@ -175,15 +240,16 @@ h3 {
 
 .info-section h4 {
   color: var(--primary-color);
-  border-bottom: 1px solid #eee;
-  padding-bottom: 5px;
-  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .info-section a {
   color: var(--primary-color);
   text-decoration: none;
   transition: var(--transition);
+  font-weight: 500;
 }
 
 .info-section a:hover {
@@ -194,15 +260,16 @@ h3 {
 /* Quick Instructions - now below 3D viewer */
 .quick-instructions {
   background-color: white;
-  padding: 15px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  padding: 18px;
+  border-radius: var(--border-radius);
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .quick-instructions h3 {
-  margin-bottom: 10px;
-  color: #2c3e50;
+  margin-bottom: 12px;
+  color: var(--primary-dark);
 }
 
 .quick-instructions ul {
@@ -210,40 +277,52 @@ h3 {
 }
 
 .quick-instructions li {
-  margin-bottom: 5px;
+  margin-bottom: 8px;
+  position: relative;
+  padding-left: 20px;
+}
+
+.quick-instructions li:before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: var(--primary-color);
+  font-weight: bold;
 }
 
 /* Accordion Styles */
 .info-accordion {
-  margin: 30px 0;
+  margin: 32px 0;
 }
 
 .accordion-item {
-  margin-bottom: 15px;
+  margin-bottom: 16px;
   border-radius: var(--border-radius);
   box-shadow: var(--shadow);
   overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .accordion-header {
   background-color: var(--card-color);
-  padding: 15px 20px;
+  padding: 16px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
   transition: var(--transition);
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .accordion-header:hover {
-  background-color: #f5f5f7;
+  background-color: #f5f7fa;
 }
 
 .accordion-header h3 {
   margin: 0;
   border: none;
   padding: 0;
+  font-size: 1.2rem;
 }
 
 .accordion-icon {
@@ -265,11 +344,12 @@ h3 {
 
 /* SVG Gallery Section */
 .svg-gallery-section {
-    margin-top: 20px;
-    padding: 15px;
-    background-color: #f9f9f9;
-    border-radius: 5px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    margin-top: 30px;
+    padding: 20px;
+    background-color: rgba(255, 255, 255, 0.7);
+    border-radius: var(--border-radius);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.06);
+    border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .svg-gallery {
@@ -280,51 +360,51 @@ h3 {
 .gallery-container {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 1rem;
+    gap: 1.2rem;
 }
 
 /* Fix gallery item sizing and make clickable */
 .gallery-item {
-    flex: 0 0 120px; /* Smaller fixed width */
-    height: 130px; /* Fixed height including title */
+    height: 140px;
     cursor: pointer;
     background: white;
-    border-radius: 4px;
-    border: 1px solid #ddd;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
     overflow: hidden;
     transition: transform 0.2s, box-shadow 0.2s;
     position: relative;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
 }
 
 .gallery-item:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    border-color: #aaa;
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+    border-color: rgba(0, 0, 0, 0.12);
 }
 
 /* Make preview container have fixed dimensions */
 .gallery-item-preview {
     width: 100%;
-    height: 90px; /* Fixed height for preview */
+    height: 100px;
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
     position: relative;
-    background-color: #f5f5f5;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 /* Make SVG objects scale appropriately */
 .gallery-item-preview object {
     max-width: 90%;
     max-height: 90%;
-    pointer-events: none; /* Important - prevents SVG from capturing clicks */
+    pointer-events: none;
 }
 
 .gallery-item-title {
     height: 40px;
-    padding: 3px 6px;
+    padding: 6px 8px;
     font-size: 12px;
     text-align: center;
     overflow: hidden;
@@ -333,55 +413,61 @@ h3 {
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     background-color: white;
+    color: var(--text-primary);
 }
 
 .gallery-loading, .gallery-error {
-    padding: 15px;
+    padding: 18px;
     text-align: center;
-    color: #666;
+    color: var(--text-secondary);
+    font-style: italic;
 }
 
 .gallery-error {
-    color: #d32f2f;
+    color: var(--danger-color);
     background-color: #ffebee;
-    border-radius: 4px;
+    border-radius: 6px;
+    border: 1px solid rgba(231, 76, 60, 0.2);
 }
 
 /* Base Design Modal Styles */
 .base-designs-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); /* Larger cards for base designs */
-  gap: 20px;
-  padding: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 22px;
+  padding: 24px;
 }
 
 .base-design-card {
   background-color: #fff;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 15px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  padding: 16px;
   text-align: center;
   cursor: pointer;
-  transition: box-shadow 0.3s ease;
+  transition: all 0.3s ease;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .base-design-card:hover, .base-design-card.selected {
-  box-shadow: 0 0 15px rgba(0, 123, 255, 0.5);
-  border-color: #007bff;
+  box-shadow: 0 0 18px rgba(74, 109, 167, 0.4);
+  border-color: var(--primary-color);
+  transform: translateY(-4px);
 }
 
 .base-design-preview {
   width: 100%;
-  height: 180px; /* Adjust height for 3D preview */
-  background-color: #f0f0f0;
-  margin-bottom: 10px;
-  border-radius: 5px;
+  height: 240px;
+  background-color: #f5f7fa;
+  margin-bottom: 12px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden; /* Ensure canvas fits */
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .base-design-preview canvas {
@@ -389,157 +475,134 @@ h3 {
   max-height: 100%;
 }
 
-
 .base-design-title {
-  font-size: 1em;
-  font-weight: bold;
-  color: #333;
-  margin-top: auto; /* Pushes title to bottom if card content varies */
+  font-size: 1.05em;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: auto;
+  padding: 10px 5px 5px;
 }
 
 .upload-card .base-design-preview.upload {
-  border: 2px dashed #007bff;
-  background-color: #e7f3ff;
+  border: 2px dashed var(--primary-color);
+  background-color: rgba(74, 109, 167, 0.05);
 }
 
 .base-design-upload-icon {
-  font-size: 3em; /* Larger upload icon */
-  color: #007bff;
+  font-size: 3.2em;
+  color: var(--primary-color);
 }
 
-/* Ensure the upload card stands out but doesn't conflict with selection */
 .base-design-card.upload-card.selected {
-  border: 2px dashed #3498db;
+  border: 2px dashed var(--primary-color);
   border-width: 3px;
-  background-color: rgba(52, 152, 219, 0.15);
+  background-color: rgba(74, 109, 167, 0.08);
 }
 
-/* Make upload text more visible */
 .base-design-card.upload-card .base-design-title {
   font-weight: 600;
-  color: #3498db;
-}
-
-.base-design-preview {
-  height: 240px; /* Increased from 160px */
-  background-color: #f5f5f5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  position: relative;
-}
-
-.base-design-preview canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.base-design-preview.upload {
-  background-color: transparent;
-}
-
-.base-design-upload-icon {
-  font-size: 48px;
-  color: #3498db;
-}
-
-.base-design-title {
-  padding: 10px;
-  text-align: center;
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: var(--primary-color);
 }
 
 .choose-base-btn {
   width: 100%;
-  padding: 12px;
-  margin-bottom: 15px;
-  background-color: #3498db;
+  padding: 14px;
+  margin-bottom: 18px;
+  background-color: var(--primary-color);
   color: white;
   border: none;
-  border-radius: 4px;
-  font-weight: bold;
+  border-radius: 6px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.25s;
+  font-size: 1.05em;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  letter-spacing: 0.3px;
 }
 
 .choose-base-btn:hover {
-  background-color: #2980b9;
+  background-color: var(--primary-dark);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
 }
 
 /* Action buttons styling */
 .action-buttons {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 10px;
-  margin-bottom: 15px;
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
 button, .prominent-button {
-  padding: 8px 15px;
+  padding: 10px 16px;
   border: none;
-  border-radius: 4px;
-  background-color: #3498db;
+  border-radius: 6px;
+  background-color: var(--primary-color);
   color: white;
-  font-weight: bold;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.25s;
   text-align: center;
   display: inline-block;
   text-decoration: none;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  letter-spacing: 0.3px;
 }
 
 button:hover, .prominent-button:hover {
-  background-color: #2980b9;
+  background-color: var(--primary-dark);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
 }
 
 button:disabled {
-  background-color: #95a5a6;
+  background-color: #b8c2cc;
   cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 .prominent-button {
-  background-color: #27ae60;
+  background-color: var(--success-color);
+  font-weight: 600;
 }
 
 .prominent-button:hover {
-  background-color: #219955;
+  background-color: #219653;
 }
 
 .view-buttons {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 15px;
+  gap: 10px;
+  margin-bottom: 18px;
 }
 
 /* Controls panel styling */
 .controls-panel {
   background-color: var(--card-color);
   border-radius: var(--border-radius);
-  padding: 20px;
+  padding: 22px;
   box-shadow: var(--shadow);
   height: fit-content;
+  border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .file-upload {
   margin-bottom: 25px;
-  background-color: #f8f9fa; /* Light background for the upload area */
-  padding: 20px;
-  border-radius: var(--border-radius);
-  border: 1px solid #e0e0e0;
-  text-align: center; /* Center the content */
+  background-color: #f8f9fa;
+  padding: 24px;
+  border-radius: 8px;
+  border: 1px dashed rgba(0, 0, 0, 0.12);
+  text-align: center;
 }
 
-.file-upload label[for="svgUpload"]:not(.custom-file-upload) { /* Target the main descriptive label */
+.file-upload label[for="svgUpload"]:not(.custom-file-upload) {
   display: block;
-  margin-bottom: 15px; /* Increased margin */
+  margin-bottom: 18px;
   font-weight: 500;
-  font-size: 1.1em; /* Slightly larger font */
+  font-size: 1.1em;
   color: var(--text-primary);
 }
 
@@ -551,62 +614,66 @@ button:disabled {
 /* Style the custom file upload button (label) */
 .custom-file-upload {
   display: inline-block;
-  padding: 10px 20px;
+  padding: 12px 22px;
   background-color: var(--primary-color);
   color: white;
   border: none;
-  border-radius: var(--border-radius);
-  font-weight: bold;
+  border-radius: 6px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: all 0.25s;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  letter-spacing: 0.3px;
 }
 
 .custom-file-upload:hover {
   background-color: var(--primary-dark);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
 }
 
 /* Control sections layout */
 .control-sections {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.5rem;
+  gap: 1.8rem;
   justify-content: space-between;
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
 }
 
 .control-section {
     flex: 1;
     min-width: 300px;
-    max-width: calc(33.33% - 1rem);
-    background-color: #f9f9f9;
-    padding: 15px; /* Slightly reduced padding */
-    border-radius: 6px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-    margin-bottom: 15px; /* Consistent margin */
+    max-width: calc(33.33% - 1.2rem);
+    background-color: rgba(255, 255, 255, 0.7);
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.06);
+    margin-bottom: 16px;
+    border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .control-section h3 {
     margin-top: 0;
-    margin-bottom: 12px; /* Reduced margin */
-    color: #6D4C41; /* Medium brown */
-    border-bottom: 2px solid #D7CCC8; /* Thicker, slightly darker underline */
-    padding-bottom: 8px; /* Space for underline */
+    margin-bottom: 16px;
+    color: var(--primary-dark);
+    border-bottom: 2px solid var(--primary-light);
+    padding-bottom: 10px;
+    font-size: 1.25rem;
 }
 
 /* Control rows */
 .control-row {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   display: flex;
   align-items: center;
 }
 
 .control-row label {
-  min-width: 80px; /* Default min-width for labels */
-  margin-right: 10px;
-  font-weight: bold;
-  color: #555;
+  min-width: 85px;
+  margin-right: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
 }
 
 .control-row input[type="number"],
@@ -614,157 +681,180 @@ button:disabled {
 .control-row input[type="color"],
 .control-row button {
   flex-grow: 1;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  padding: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
   box-sizing: border-box;
+  font-family: var(--body-font);
+}
+
+.control-row input[type="number"]:focus,
+.control-row input[type="file"]:focus,
+.control-row input[type="color"]:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(74, 109, 167, 0.2);
 }
 
 .control-row input[type="range"] {
   flex-grow: 1;
+  height: 6px;
+  -webkit-appearance: none;
+  background: #e0e0e0;
+  border-radius: 3px;
+  outline: none;
 }
 
-.control-row span { /* For slider value displays */
-  margin-left: 10px;
-  min-width: 30px;
+.control-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--primary-color);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.control-row span {
+  margin-left: 12px;
+  min-width: 32px;
+  font-weight: 500;
 }
 
 /* Welcome message in modal */
 .welcome-message {
   text-align: center;
-  margin-bottom: 20px;
-  padding: 15px;
+  margin-bottom: 24px;
+  padding: 20px;
   background-color: #f1f9f7;
-  border-radius: 8px;
-  border-left: 4px solid #27ae60;
+  border-radius: 10px;
+  border-left: 4px solid var(--success-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .welcome-message h3 {
-  margin-bottom: 10px;
-  color: #2c3e50;
+  margin-bottom: 12px;
+  color: var(--success-color);
+  border-bottom: none;
 }
 
 .welcome-message p {
-  color: #34495e;
+  color: var(--text-primary);
   font-size: 1.1em;
 }
 
 /* About and resources styles */
 .about-resources {
-    background-color: #fdfdfd; /* Slightly off-white for a subtle distinction */
-    padding: 20px; /* Increased padding */
-    border-radius: 8px; /* Consistent with other sections */
-    box-shadow: 0 3px 6px rgba(0,0,0,0.08); /* Slightly more pronounced shadow */
-    margin-top: 25px; /* More space above this section */
-    margin-bottom: 20px;
+    background-color: rgba(255, 255, 255, 0.7);
+    padding: 25px;
+    border-radius: var(--border-radius);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.06);
+    margin-top: 30px;
+    margin-bottom: 25px;
+    border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .about-resources h3 {
     margin-top: 0;
-    margin-bottom: 20px; /* More space below header */
-    color: #5D4037; /* Darker brown for prominence */
-    border-bottom: 3px solid #BCAAA4; /* Thicker, slightly darker underline */
-    padding-bottom: 10px;
-    font-size: 1.6em; /* Larger font size for the main section header */
-    text-align: center; /* Center the main header */
+    margin-bottom: 24px;
+    color: var(--primary-dark);
+    border-bottom: 3px solid var(--primary-light);
+    padding-bottom: 12px;
+    font-size: 1.6em;
+    text-align: center;
 }
 
 .info-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Responsive columns */
-    gap: 20px; /* Increased gap between sections */
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 22px;
 }
 
 .info-section {
     background-color: #fff;
-    padding: 18px; /* Increased padding */
-    border-radius: 6px;
-    border: 1px solid #e0e0e0; /* Softer border */
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-    transition: box-shadow 0.3s ease;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
 }
 
 .info-section:hover {
-    box-shadow: 0 4px 8px rgba(0,0,0,0.08); /* Enhanced shadow on hover */
+    box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    transform: translateY(-2px);
 }
 
 .info-section h4 {
     margin-top: 0;
-    margin-bottom: 12px;
-    color: #795548; /* Medium-dark brown */
-    font-size: 1.15em; /* Slightly larger sub-header */
-    border-bottom: 1px solid #eee;
-    padding-bottom: 6px;
+    margin-bottom: 14px;
+    color: var(--primary-color);
+    font-size: 1.2em;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    padding-bottom: 8px;
 }
 
 .info-section p, .info-section ul {
     font-size: 0.95em;
-    line-height: 1.7; /* Improved readability */
-    color: #424242; /* Darker gray for text */
+    line-height: 1.7;
+    color: var(--text-primary);
 }
 
 .info-section ul {
-    list-style-type: disc; /* Standard bullets */
-    padding-left: 20px; /* Indent list */
+    list-style-type: disc;
+    padding-left: 22px;
     margin-top: 0;
 }
 
 .info-section li {
-    margin-bottom: 8px; /* Space between list items */
+    margin-bottom: 10px;
 }
 
 .info-section a {
-    color: #00796B; /* Teal color for links */
+    color: var(--primary-color);
     text-decoration: none;
-    font-weight: 500; /* Slightly bolder links */
+    font-weight: 500;
     transition: color 0.2s ease;
 }
 
 .info-section a:hover, .info-section a:focus {
-    color: #004D40; /* Darker teal on hover */
+    color: var(--primary-dark);
     text-decoration: underline;
 }
 
 .author-info {
-    margin-top: 15px;
-    padding-top: 10px;
-    border-top: 1px dashed #e0e0e0; /* Dashed separator */
+    margin-top: 18px;
+    padding-top: 12px;
+    border-top: 1px dashed rgba(0, 0, 0, 0.08);
 }
 
 .author-info p {
-    margin-bottom: 5px;
+    margin-bottom: 6px;
 }
 
 .github-icon {
-    width: 18px; /* Slightly larger icon */
+    width: 18px;
     height: 18px;
     vertical-align: middle;
-    margin-right: 6px; /* Space next to icon */
+    margin-right: 6px;
 }
 
 .highlight-section {
-    background-color: #E0F2F1; /* Light teal background for highlighted sections */
-    border-left: 4px solid #00796B; /* Teal left border */
+    background-color: rgba(232, 245, 233, 0.5);
+    border-left: 4px solid var(--success-color);
 }
 
 .highlight-section h4 {
-    color: #004D40; /* Darker teal for header in highlighted section */
+    color: #2e7d32;
 }
 
 .prominent-link {
-    font-weight: bold; /* Ensure prominent links are bold */
-    color: #BF360C !important; /* Distinctive color for prominent links, override others */
+    font-weight: bold;
+    color: var(--accent-color) !important;
 }
 
 .prominent-link:hover {
-    color: #870000 !important; /* Darker shade on hover */
+    color: #d35400 !important;
     text-decoration: underline !important;
 }
-
-.highlight-item .prominent-link {
-    /* Specific styling if needed for prominent links within highlighted items */
-}
-
 
 /* Modal styles */
 .modal {
@@ -777,263 +867,172 @@ button:disabled {
   height: 100%;
   overflow: auto;
   background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
 
 .modal-content {
   position: relative;
-  background-color: #f8f8f8;
-  margin: 5% auto;
-  padding: 20px;
+  background-color: #fff;
+  margin: 3% auto;
   width: 90%;
-  max-width: 1200px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
-  animation: modalFadeIn 0.3s;
+  max-width: 1000px;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  animation: slideIn 0.3s ease;
+  overflow: hidden;
   max-height: 90vh;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.modal-header {
+  padding: 16px 24px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: var(--primary-dark);
+  font-size: 1.6rem;
+}
+
+.modal-body {
+  padding: 24px;
   overflow-y: auto;
+  max-height: calc(90vh - 140px);
 }
 
 .modal-footer {
     margin-top: 20px;
-    padding-top: 15px;
-    border-top: 1px solid #ddd;
+    padding: 16px 24px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
     text-align: right;
+    background-color: #f8f9fa;
 }
 
 .modal-footer button {
-    padding: 8px 16px;
-    margin-left: 10px;
-    border-radius: 4px;
+    padding: 10px 18px;
+    margin-left: 12px;
+    border-radius: 6px;
     border: none;
     cursor: pointer;
-    font-weight: 500;
+    font-weight: 600;
+    letter-spacing: 0.3px;
 }
 
 #applyConfigBtn {
-    background-color: #4CAF50;
+    background-color: var(--success-color);
     color: white;
 }
 
 #applyConfigBtn:hover {
-    background-color: #45a049;
+    background-color: #219653;
 }
 
 #resetConfigBtn {
-    background-color: #f44336;
+    background-color: var(--danger-color);
     color: white;
 }
 
 #resetConfigBtn:hover {
-    background-color: #d32f2f;
+    background-color: #c0392b;
 }
 
-/* Make the container wider */
-.container {
-    max-width: 1400px;
-    width: 95%;
-    margin: 0 auto;
-    padding: 1rem;
+.close {
+  color: #666;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: color 0.2s;
 }
 
-/* Make the 3D viewer shorter */
-#three-container {
-    height: 400px;
-    width: 100%;
-    position: relative;
-    overflow: hidden;
-    border-radius: 8px;
-}
-
-/* Add these styles for the shape position controls */
-.shape-position-controls {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    margin-bottom: 10px;
-    gap: 5px;
-}
-
-.shape-position-input-container {
-    display: inline-flex;
-    align-items: center;
-    margin-right: 8px;
-}
-
-.shape-position-input {
-    width: 50px;
-    padding: 2px 4px;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    font-size: 12px;
-}
-
-.shape-position-input-container label {
-    margin-right: 3px;
-    font-size: 12px;
-    font-weight: bold;
-    color: #555;
-}
-
-.shape-control-label {
-    font-size: 12px;
-    font-weight: bold;
-    color: #555;
-    margin-right: 5px;
-}
-
-/* Add a small margin between controls */
-.shape-advanced-controls > * {
-    margin-bottom: 8px;
-}
-
-/* Media queries for responsive layout */
-@media (max-width: 992px) {
-  .control-sections {
-    grid-template-columns: 1fr 1fr;
-  }
-  
-  .base-designs-grid {
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  }
-}
-
-@media (max-width: 768px) {
-  .control-sections {
-    grid-template-columns: 1fr;
-  }
-  
-  #preview-container {
-    height: 60vh;
-    min-height: 400px;
-  }
-  
-  .base-designs-grid {
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  }
-  
-  .base-design-card {
-    height: 280px;
-  }
-  
-  .base-design-preview {
-    height: 220px;
-  }
-}
-
-@media (max-width: 480px) {
-  .view-buttons {
-    grid-template-columns: 1fr;
-  }
-  
-  .base-designs-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (min-width: 1800px) {
-  .base-select-content {
-    margin-top: 40px;
-  }
+.close:hover {
+  color: var(--primary-dark);
 }
 
 /* Base Rotation Controls */
 .rotation-controls {
-    margin-top: 15px;
-    padding-top: 15px;
-    border-top: 1px solid #f1f1f1;
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .control-label {
-    font-weight: 500;
-    margin-bottom: 8px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: var(--text-secondary);
 }
 
 .rotation-buttons {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
+    gap: 10px;
 }
 
 .rotation-btn {
-    padding: 8px 0;
+    padding: 10px 0;
     border: none;
-    border-radius: 4px;
-    background-color: #3498db;
+    border-radius: 6px;
+    background-color: var(--primary-color);
     color: white;
-    font-weight: bold;
+    font-weight: 600;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: all 0.25s;
+    font-size: 0.95em;
 }
 
 .rotation-btn:hover {
-    background-color: #2980b9;
+    background-color: var(--primary-dark);
+    transform: translateY(-2px);
 }
 
 .rotation-btn.reset-btn {
-    background-color: #e74c3c;
+    background-color: var(--danger-color);
 }
 
 .rotation-btn.reset-btn:hover {
     background-color: #c0392b;
 }
 
-/* Make sure dimension controls have room when viewport gets smaller */
-@media (max-width: 992px) {
-    .base-dimensions {
-        margin-bottom: 15px;
-    }
-}
-
-/* New styles for modified buttons and design section */
-.extrusion-section .file-upload {
-    margin-bottom: 15px;
-}
-
-.extrusion-section .design-properties {
-    border: 1px solid #e0e0e0;
-    /* padding: 15px; Remove padding here, will be on content or header */
-    border-radius: 6px;
-    background-color: #fdfdfd;
-    /* display: flex; Remove flex here as accordion handles layout */
-    /* flex-direction: column; */
-    /* gap: 10px; */
-}
-
-/* SVG Properties Accordion Header */
+/* SVG Properties Accordion Styling */
 .accordion-header-svg {
-    background-color: #fdfdfd; /* Match parent or slightly different */
-    color: #444;
+    background-color: #f8f9fa;
+    color: var(--text-primary);
     cursor: pointer;
-    padding: 10px 15px;
+    padding: 12px 16px;
     width: 100%;
     border: none;
-    border-bottom: 1px solid #eee; /* Separator if content is visible */
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
     text-align: left;
     outline: none;
-    font-size: 1em; /* Adjust as needed */
+    font-size: 1em;
     transition: background-color 0.3s ease;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-radius: 6px 6px 0 0; /* Rounded top corners */
 }
 
 .accordion-header-svg:hover {
-    background-color: #f0f0f0;
+    background-color: #edf2f7;
 }
 
 .accordion-header-svg h4 {
     margin: 0;
-    font-size: 1.1em; /* Keep h4 styling */
-    color: #444; /* Ensure h4 color is consistent */
-    border-bottom: none; /* Remove h4's own border */
-    padding-bottom: 0; /* Remove h4's own padding */
+    font-size: 1.1em;
+    color: var(--primary-dark);
+    border-bottom: none;
+    padding-bottom: 0;
 }
 
 .accordion-icon-svg {
     font-size: 1.2em;
     font-weight: bold;
     transition: transform 0.3s ease;
+    color: var(--primary-color);
 }
 
 .accordion-header-svg.active .accordion-icon-svg {
@@ -1041,258 +1040,102 @@ button:disabled {
 }
 
 .accordion-header-svg.active {
-     border-radius: 6px 6px 0 0; /* Keep top corners rounded */
-     border-bottom-color: #ddd; /* Stronger border when active and content shown */
+     border-radius: 6px 6px 0 0;
+     border-bottom-color: rgba(0, 0, 0, 0.1);
+     background-color: #f1f5f9;
 }
+
 .accordion-header-svg:not(.active) {
-    border-radius: 6px; /* All corners rounded when closed */
+    border-radius: 6px;
     border-bottom: none;
 }
 
-
-/* SVG Properties Accordion Content */
 .accordion-content-svg {
-    padding: 0 15px; /* Add padding only when open, or keep it and use max-height */
-    background-color: #fdfdfd; /* Match parent */
+    padding: 0 16px;
+    background-color: #fdfdfd;
     max-height: 0;
     overflow: hidden;
     transition: max-height 0.3s ease-out, padding 0.3s ease-out;
-    border-radius: 0 0 6px 6px; /* Rounded bottom corners */
+    border-radius: 0 0 6px 6px;
 }
 
 .accordion-content-svg.active {
-    /* max-height will be set by JS, e.g., scrollHeight */
-    /* padding: 15px; /* Apply padding when active */
-    /* Temporary large max-height for CSS only demo, JS should set this dynamically */
-    /* max-height: 500px; */ 
-    padding-top: 15px;
-    padding-bottom: 15px;
+    padding-top: 18px;
+    padding-bottom: 18px;
 }
 
-
-/* Original .extrusion-section .design-properties h4 is now part of .accordion-header-svg h4 */
-/* .extrusion-section .design-properties h4 { ... } */ /* This can be removed or adjusted if still needed elsewhere */
-
-/* Specific adjustments for control rows within design-properties accordion content */
-.accordion-content-svg .control-row {
-    display: flex;
-    flex-wrap: wrap; /* Allow label and input to wrap if necessary on very small screens */
-    align-items: center;
-    margin-bottom: 10px; /* Slightly reduce margin */
-}
-
-.accordion-content-svg .control-row label {
-    /* Make label more flexible */
-    min-width: 60px; /* Reduce min-width */
-    flex-shrink: 0; /* Prevent label from shrinking too much initially */
-    margin-right: 8px;
-    font-weight: normal; /* Less emphasis than general control-row labels if desired */
-}
-
-.accordion-content-svg .control-row input[type="number"] {
-    flex-grow: 1;
-    flex-shrink: 1; /* Allow input to shrink */
-    min-width: 80px; /* Ensure input is still usable when shrunk */
-    padding: 6px; /* Slightly reduce padding */
-}
-
-
-.extrusion-section .position-label {
-    font-weight: bold;
-    margin-top: 15px;
-    margin-bottom: 5px;
-    color: #555;
+/* Position controls */
+.position-label {
+    font-weight: 600;
+    margin-top: 16px;
+    margin-bottom: 8px;
+    color: var(--text-secondary);
 }
 
 .position-controls {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); /* Adjust minmax for slightly wider items if needed */
-    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+    background-color: #f8f9fa;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
-/* Ensure control-row inside position-controls also benefits */
 .position-controls .control-row {
-    margin-bottom: 0; /* Remove bottom margin as gap is handled by grid */
+    margin-bottom: 0;
 }
 
 .position-controls .control-row label {
-    min-width: 20px; /* Minimal width for X, Y, Z labels */
-    font-weight: bold; /* Keep X,Y,Z labels bold */
-    margin-right: 5px;
+    min-width: 22px;
+    font-weight: 600;
+    margin-right: 8px;
+    color: var(--primary-dark);
 }
 
 .position-controls .control-row input[type="number"] {
-    min-width: 60px; /* Allow X,Y,Z inputs to be a bit smaller */
-}
-
-
-.options-section .action-buttons {
-    display: flex;
-    flex-direction: column; /* Stack buttons vertically */
-    gap: 10px; /* Space between buttons */
-    margin-bottom: 15px;
-}
-
-.options-section .action-button {
-    padding: 10px 15px;
-    font-size: 1em;
+    min-width: 65px;
+    padding: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
     border-radius: 5px;
-    text-align: center;
-    text-decoration: none;
-    display: block; /* Make <a> behave like a button for sizing */
 }
 
-.options-section .large-action-button {
-    padding: 12px 20px; /* Larger padding */
-    font-size: 1.1em;   /* Larger font */
-    font-weight: bold;
-}
-
-.options-section .prominent-button {
-    background-color: #28a745; /* Green for holder download */
-    color: white;
-    border: none;
-}
-.options-section .prominent-button:hover {
-    background-color: #218838;
-}
-
-
-.options-section .view-buttons {
-    display: flex;
-    gap: 10px;
-    justify-content: flex-start; /* Align to the start */
-}
-
-.options-section .view-buttons button {
-    flex-grow: 1; /* Allow buttons to grow if needed, or set fixed width */
-}
-
-.config-button-grayed {
-    background-color: #e0e0e0;
-    color: #888;
-    cursor: not-allowed; /* Optional: indicate it's not active */
-    border: 1px solid #ccc;
-}
-.config-button-grayed:hover {
-    background-color: #d5d5d5;
-}
-
-
-/* Quick Controls (now potentially within base-section) */
-.quick-controls {
-    margin-top: 15px; /* Add some space if it's directly under other base controls */
-    padding: 10px;
-    background-color: #f9f9f9;
-    border-radius: 5px;
-    border: 1px solid #eee;
-}
-
-.quick-controls .control-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between; /* Pushes label and input apart */
-}
-
-.quick-controls label {
-    margin-right: 10px;
-    font-weight: normal;
-}
-
-.quick-controls input[type="color"] {
-    width: 60px; /* Adjust as needed */
-    height: 30px;
-    border: 1px solid #ccc;
-    padding: 2px;
-}
-
-/* Utility class to hide elements */
-.hidden {
-    display: none !important; /* Ensure this overrides other display properties */
-}
-
-.viewer-and-shape-list-container {
-    display: flex;
-    flex-direction: row;
-    gap: 15px; /* Space between viewer and shape list */
-    margin-bottom: 20px;
-}
-
-.full-width-viewer {
-    flex-grow: 1; /* Viewer takes available space */
-    /* min-width: 0; */ /* Prevents viewer from shrinking too much if shape list is wide */
-}
-
-#preview-container {
-    position: relative;
-    height: 400px; /* Match three-container height */
-    width: 100%;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
-#three-container {
-    position: relative;
-    width: 100%;
-    height: 400px; /* Reduced height */
-    overflow: hidden;
-    border-radius: 8px;
-}
-
-.shape-list-panel {
-    width: 250px; /* Fixed width for the shape list */
-    min-width: 200px; /* Minimum width */
-    max-width: 300px; /* Maximum width */
-    background-color: #f9f9f9;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 15px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    height: fit-content; /* Adjust height to content */
-    max-height: 500px; /* Max height to prevent it from becoming too tall, matches viewer example */
-    overflow-y: auto; /* Scroll if content exceeds max-height */
-}
-
-.shape-list-panel h3 {
-    margin-top: 0;
-    margin-bottom: 10px;
-    font-size: 1.1em;
-    color: #333;
-    padding-bottom: 5px;
-    border-bottom: 1px solid #ddd;
-}
-
+/* Shape list styling */
 .shape-list-content {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
 }
 
 .shape-list-item {
     display: flex;
-    /* align-items: center; */ /* Allow items to wrap if needed */
-    flex-direction: column; /* Stack main and advanced controls */
-    padding: 8px 5px;
-    border-bottom: 1px solid #eee;
-    gap: 6px; /* Gap between main and advanced sections */
+    flex-direction: column;
+    padding: 10px 8px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    gap: 8px;
+    background-color: rgba(255, 255, 255, 0.7);
+    border-radius: 6px;
+    transition: box-shadow 0.2s;
+}
+
+.shape-list-item:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .shape-main-controls, .shape-advanced-controls {
     display: flex;
     align-items: center;
-    gap: 8px; /* Gap between controls within a row */
+    gap: 8px;
     width: 100%;
 }
 
 .shape-advanced-controls {
-    padding-top: 4px; /* Some spacing from main controls */
-    /* justify-content: space-between; */ /* Distribute items */
+    padding-top: 6px;
+    border-top: 1px dashed rgba(0, 0, 0, 0.06);
 }
 
-
 .shape-list-item:last-child {
-  border-bottom: none; /* Remove border for the last item */
+    border-bottom: none;
 }
 
 .shape-list-item label {
@@ -1302,136 +1145,241 @@ button:disabled {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 100px; /* Adjust as needed, was 120px */
+    max-width: 100px;
+    font-weight: 500;
 }
 
 .shape-list-item input[type="checkbox"] {
     margin-right: 5px;
     cursor: pointer;
+    width: 16px;
+    height: 16px;
 }
 
 .no-shapes-message {
-  text-align: center;
-  color: #999;
-  padding: 20px;
-  border: 1px dashed #ccc;
-  border-radius: 4px;
-  background-color: #f9f9f9;
-  margin-top: 10px;
+    text-align: center;
+    color: #888;
+    padding: 24px 12px;
+    border: 1px dashed #ccc;
+    border-radius: 6px;
+    background-color: rgba(249, 249, 249, 0.8);
+    margin-top: 10px;
+    font-style: italic;
 }
-
-/* Styles for new shape controls */
-/* .shape-color-picker { // REMOVED
-    width: 22px; 
-    height: 22px; 
-    padding: 0;
-    border: 1px solid #ccc;
-    cursor: pointer;
-    -webkit-appearance: none; 
-    -moz-appearance: none; 
-    appearance: none; 
-    background-color: transparent; 
-}
-.shape-color-picker::-webkit-color-swatch-wrapper { // REMOVED
-    padding: 0;
-}
-.shape-color-picker::-webkit-color-swatch { // REMOVED
-    border: none;
-    border-radius: 4px; 
-}
-.shape-color-picker::-moz-color-swatch { // REMOVED
-    border: none;
-    border-radius: 4px; 
-} */
-
-
-/* .shape-height-input { // REMOVED
-    width: 45px; 
-    padding: 2px 4px;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    font-size: 0.9em;
-} */
 
 .shape-control-label {
     font-size: 0.8em;
-    color: #555;
-    white-space: nowrap; /* Prevent wrapping for short labels like H: and Op: */
+    color: var(--text-secondary);
+    white-space: nowrap;
+    font-weight: 600;
 }
 
 .shape-control-label-inline {
     font-size: 0.85em;
-    color: #333;
+    color: var(--text-primary);
     margin-left: 2px;
     margin-right: 5px;
     cursor: pointer;
 }
 
-
 .shape-delete-button {
-    background-color: #ffdddd;
-    color: #c00;
+    background-color: #ffeeee;
+    color: var(--danger-color);
     border: none;
     border-radius: 4px;
     padding: 6px 10px;
     font-size: 0.9em;
     cursor: pointer;
-    transition: background-color 0.2s ease;
-    margin-left: auto; /* Push to the right, ensure it's the last item in its flex container */
+    transition: all 0.2s ease;
+    margin-left: auto;
+    box-shadow: none;
 }
 
 .shape-delete-button:hover {
-    background-color: #ffcccc;
+    background-color: #ffdddd;
+    color: #b71c1c;
 }
 
 .shape-operation-select {
-    padding: 2px 4px;
-    border: 1px solid #ccc;
-    border-radius: 3px;
+    padding: 3px 6px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
     font-size: 0.85em;
-    max-width: 80px; /* Control width */
-}
-
-
-/* Shape List Styling */
-.shape-list-panel {
-    position: absolute; /* Position it over the viewer */
-    top: 10px;
-    right: 10px;
-    width: 280px; /* Adjust width as needed for an overlay */
-    max-height: calc(100% - 20px); /* Max height relative to viewer, with padding */
-    background-color: rgba(249, 249, 249, 0.9); /* Semi-transparent background */
-    border: 1px solid #ccc; /* Unified border */
-    border-radius: 5px;
-    padding: 10px;
-    overflow-y: auto;
-    z-index: 10; /* Ensure it's above the three-container canvas */
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* Optional: add some shadow */
-    /* Removed border-left as it's now a floating panel */
-}
-
-.shape-list-panel h3 {
-    margin-top: 0;
-    margin-bottom: 10px;
-    font-size: 1.1em;
-    color: #333;
-    padding-bottom: 5px;
-    border-bottom: 1px solid #ddd;
+    max-width: 80px;
+    background-color: white;
 }
 
 .shape-winding-toggle {
-    /* New button for toggling winding order */
-    padding: 2px 4px;
-    background-color: #f0f0f0;
+    padding: 3px 6px;
+    background-color: #f1f5f9;
     border: 1px solid #ddd;
-    border-radius: 3px;
-    font-size: 0.7rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
     cursor: pointer;
     margin-left: 5px;
+    transition: background-color 0.2s;
 }
 
 .shape-winding-toggle:hover {
-    background-color: #e0e0e0;
+    background-color: #e1e8f0;
+}
+
+/* Quick Controls */
+.quick-controls {
+    margin-top: 16px;
+    padding: 14px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.quick-controls .control-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0;
+}
+
+.quick-controls label {
+    margin-right: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.quick-controls input[type="color"] {
+    width: 65px;
+    height: 34px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 2px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+/* Disabled button styling */
+.config-button.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background-color: #a0aec0;
+    color: white;
+    position: relative;
+    box-shadow: none;
+}
+
+.config-button.disabled:hover {
+    background-color: #a0aec0;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Tooltip for disabled buttons */
+.config-button.disabled:hover::after {
+    content: "Work in Progress";
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #2d3748;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 100;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* Triangle pointer for tooltip */
+.config-button.disabled:hover::before {
+    content: "";
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 6px;
+    border-style: solid;
+    border-color: transparent transparent #2d3748 transparent;
+    z-index: 100;
+}
+
+/* Animation for modals */
+@keyframes slideIn {
+  from { transform: translateY(-30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Media queries for responsive layout */
+@media (max-width: 992px) {
+  .control-sections {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .base-designs-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  h1 {
+    font-size: 2.8rem;
+  }
+  
+  .control-sections {
+    grid-template-columns: 1fr;
+  }
+  
+  #preview-container {
+    width: 98%;
+    padding-bottom: 65%;
+  }
+  
+  .shape-list-panel {
+    width: 180px;
+    font-size: 0.8rem;
+  }
+  
+  .base-designs-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 15px;
+  }
+  
+  .base-design-card {
+    height: 280px;
+  }
+  
+  .base-design-preview {
+    height: 220px;
+  }
+  
+  .container {
+    width: 95%;
+    padding: 1.2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  h1 {
+    font-size: 2.2rem;
+  }
+  
+  .view-buttons {
+    grid-template-columns: 1fr;
+  }
+  
+  .base-designs-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .custom-file-upload {
+    padding: 10px 16px;
+  }
+}
+
+@media (min-width: 1800px) {
+  .base-select-content {
+    margin-top: 40px;
+  }
+  
+  .container {
+    max-width: 1600px;
+  }
 }

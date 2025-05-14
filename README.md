@@ -23,6 +23,34 @@ StampForge is an open-source tool for creating 3D models from SVG files, designe
 - Export models as STL files for 3D printing
 - Browse the SVG gallery to quickly select designs
 
+## Camera Controls
+
+The application provides several ways to view your stamp:
+
+- **Orbit Controls**: Click and drag to rotate the view
+- **Top View**: View the stamp from directly above (perpendicular to the stamp face)
+- **Side View**: View the stamp from the side to check height and positioning
+- The camera starts in a rotated view (180 degrees) for better model visualization
+
+## UI Sections
+
+The application is divided into several control sections:
+
+### Design Section
+- Upload SVG designs
+- Scale your design
+- Position your design on the base
+- Toggle automatic Y-offset
+
+### Base Section
+- Choose from different base designs
+- Rotate the base along X, Y, and Z axes
+
+### Options Section
+- Download STL files
+- Access to camera view controls (Top and Side views)
+- Configuration options
+
 ## Installation
 
 1. Clone the repository:
@@ -63,6 +91,7 @@ For best results when 3D printing your stamps:
 - **Enable ironing** on top-most surfaces in your slicer for a smooth finish on the stamp face
 - Use a relatively high infill (40%+) for durability
 - Consider printing with a flexible material for better stamping results
+- A shore hardness of 95A works well for most stamping applications
 
 ## ⚠️ Known Issues
 
@@ -73,11 +102,6 @@ For best results when 3D printing your stamps:
 
 - [Printables Page](https://www.printables.com/model/1285748-stampforge-customizable-svg-to-stamp) - See examples and share your prints
 - [Onshape Design](https://cad.onshape.com/documents/b8df565e3ee5bf1496f24090/w/ae81aeeee47b9edd37d47bd6/e/7bbac46e537c734a00283271?renderMode=0&uiState=6817b59c4f958a65368d6c7d) - View and modify the source CAD
-
-## SVG Resources
-
-Here are some great resources for finding SVG files to use with StampForge:
-
 - [SVG Repo](https://www.svgrepo.com/) - Free SVG icons and vectors
 - [SVG Repo](https://www.svgrepo.com/collection/chunk-16px-thick-interface-icons/) - Chunk 16px
 

@@ -30,7 +30,13 @@ window.initScene = function() {
         
         setupLights();
         
-        window.addEventListener('resize', onWindowResize);
+        // Create a proper resize handler to fix stretching
+        window.addEventListener('resize', function() {
+            updateRendererSize();
+        });
+
+        // Initial size setup
+        updateRendererSize();
         
         animate();
     } catch (error) {
@@ -73,6 +79,49 @@ function onWindowResize() {
     window.renderer.setSize(container.clientWidth, container.clientHeight);
     
     window.render();
+}
+
+function updateRendererSize() {
+    if (!renderer || !camera) return;
+    
+    const container = document.getElementById('three-container');
+    if (!container) return;
+    
+    // Get the container dimensions
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    
+    // Update renderer size
+    renderer.setSize(width, height);
+    
+    // Update camera aspect ratio
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    
+    // Force a render
+    if (scene) renderer.render(scene, camera);
+}
+
+// Make updateRendererSize globally available
+window.updateRendererSize = updateRendererSize;
+
+// Schedule periodic checks to ensure correct aspect ratio
+function scheduleAspectRatioChecks() {
+    // Initial check
+    setTimeout(updateRendererSize, 500);
+    
+    // Additional checks in case layout changes affect the container size
+    setTimeout(updateRendererSize, 1000);
+    setTimeout(updateRendererSize, 2000);
+}
+
+// Call this after initializing the scene
+function onSceneInitialized() {
+    // Schedule aspect ratio checks
+    scheduleAspectRatioChecks();
+    
+    // Ensure renderer size is updated
+    updateRendererSize();
 }
 
 window.render = function() {
@@ -144,6 +193,40 @@ window.fitCameraToObject = function(offset = 1.5) {
 
     window.render();
 };
+
+// Add global camera view functions
+window.setCameraTopView = function() {
+    // Position camera above but rotated 180 degrees (negative Z)
+    camera.position.set(0, 50, -0.1);
+    camera.lookAt(0, 0, 0);
+    controls.update();
+    renderer.render(scene, camera);
+}
+
+window.setCameraSideView = function() {
+    // Get current brick height for proper positioning
+    const baseHeight = (window.brickDimensions && window.brickDimensions.height) ? 
+        window.brickDimensions.height : 3;
+    
+    camera.position.set(50, baseHeight/2 + 5, 0);
+    camera.lookAt(0, baseHeight/2, 0);
+    controls.update();
+    renderer.render(scene, camera);
+}
+
+// Attach to buttons when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    const topViewBtn = document.getElementById('topView');
+    const sideViewBtn = document.getElementById('sideView');
+    
+    if (topViewBtn) {
+        topViewBtn.addEventListener('click', window.setCameraTopView);
+    }
+    
+    if (sideViewBtn) {
+        sideViewBtn.addEventListener('click', window.setCameraSideView);
+    }
+});
 
 // Remove stub functions as full implementations are in js/utils/utilities.js
 

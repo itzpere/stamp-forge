@@ -73,10 +73,6 @@
                             <input type="number" id="svgScale" min="0.05" max="5.0" step="0.05" value="1" title="Adjust the size of the SVG design">
                         </div>
                         <div class="control-row">
-                            <input type="checkbox" id="svgAssumeCCW" checked>
-                            <label for="svgAssumeCCW" title="Assume Counter-Clockwise paths are exteriors. Uncheck if SVG holes/solids are inverted.">Assume CCW Exteriors</label>
-                        </div>
-                        <div class="control-row">
                             <input type="checkbox" id="autoSetYOffset" checked>
                             <label for="autoSetYOffset" title="Automatically set design Y offset to sit on top of the base. Uncheck for manual Y positioning.">Auto-adjust Design Y Offset</label>
                         </div>
@@ -93,7 +89,6 @@
             <div class="control-section base-section">
                 <h3>Base</h3>
                 <div class="base-controls"><button id="chooseBaseBtn" class="choose-base-btn">Choose Base Design</button></div>
-                <div class="quick-controls"><div class="control-row"><label for="brickColor">Color:</label><input type="color" id="brickColor" value="#bc8f8f"></div></div>
                 <div class="rotation-controls">
                     <div class="control-label">Rotation:</div>
                     <div class="rotation-buttons">
@@ -114,7 +109,7 @@
                 <div class="view-buttons">
                     <button id="topView">Top View</button>
                     <button id="sideView">Side View</button>
-                    <button id="configBtn" class="config-button">⚙️ Config</button>
+                    <button id="configBtn" class="config-button disabled" title="Work in Progress">⚙️ Config</button>
                 </div>
             </div>
         </div>
@@ -131,9 +126,30 @@
         <div class="about-resources">
             <h3>About & Resources</h3>
             <div class="info-grid">
-                <div class="info-section"><h4>About This Project</h4><p>StampForge is an open-source tool...</p><div class="author-info"><p><strong>Created by:</strong> Petar Miletić</p><p><a href="https://github.com/itzpere" target="_blank"><img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" class="github-icon" alt="GitHub"> github.com/itzpere</a></p></div></div>
-                <div class="info-section"><h4>Printing Tips</h4><ul><li><strong>Recommended:</strong> Enable <em>ironing</em>...</li><li><strong>Recommended:</strong> Print this part in TPU...</li></ul></div>
-                <div class="info-section highlight-section"><h4>Essential Resources</h4><ul><li><a href="https://www.svgrepo.com/" target="_blank">SVG Repo</a>...</li><li class="highlight-item"><a href="https://www.printables.com/model/1285748-stampforge-customizable-svg-to-stamp" target="_blank" class="prominent-link">Download Stamp Holder</a></li><li><a href="https://www.printables.com/model/1285748-stampforge-customizable-svg-to-stamp" target="_blank">Printables Page</a></li><li><a href="https://github.com/itzpere/stamp-forge" target="_blank">GitHub Repository</a></li></ul></div>
+                <div class="info-section">
+                    <h4>About This Project</h4>
+                    <p>StampForge is an open-source tool for creating custom rubber stamps from SVG files. Upload your SVG design, customize it, and generate a 3D printable stamp.</p>
+                    <div class="author-info">
+                        <p><strong>Created by:</strong> Petar Miletić</p>
+                        <p><a href="https://github.com/itzpere" target="_blank"><img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" class="github-icon" alt="GitHub"> github.com/itzpere</a></p>
+                    </div>
+                </div>
+                <div class="info-section">
+                    <h4>Printing Tips</h4>
+                    <ul>
+                        <li><strong>Recommended:</strong> Enable <em>ironing</em> in your slicer settings for a smooth top surface which will create cleaner stamp impressions.</li>
+                        <li><strong>Recommended:</strong> Print this part in TPU or other flexible filament for better stamping results. A shore hardness of 95A works well.</li>
+                    </ul>
+                </div>
+                <div class="info-section highlight-section">
+                    <h4>Essential Resources</h4>
+                    <ul>
+                        <li><a href="https://www.svgrepo.com/" target="_blank">SVG Repo</a> - Free SVG vector resources for your stamps</li>
+                        <li class="highlight-item"><a href="https://www.printables.com/model/1285748-stampforge-customizable-svg-to-stamp" target="_blank" class="prominent-link">Download Stamp Holder</a></li>
+                        <li><a href="https://www.printables.com/model/1285748-stampforge-customizable-svg-to-stamp" target="_blank">Printables Page</a></li>
+                        <li><a href="https://github.com/itzpere/stamp-forge" target="_blank">GitHub Repository</a></li>
+                    </ul>
+                </div>
             </div>
         </div>
         

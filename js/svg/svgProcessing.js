@@ -29,6 +29,11 @@ if (window.svgProcessingInitialized) {
         startTime = performance.now();
         const settings = window.svgGlobalSettings;
         
+        // Ensure window.config and its properties are available
+        const currentConfig = window.config || {};
+        const defaultOperation = currentConfig.defaultShapeOperation || 'extrude';
+        const currentHoleSettings = currentConfig.holeDetectionSettings || { aggressiveness: 0.7, areaRatioThreshold: 0.5, pointsInsideThreshold: 0.6 };
+
         const { pathsToProcess, svgCenterX, svgCenterY, effectiveScale, lowQuality, isExport } = options;
         const totalPaths = pathsToProcess.length;
         
@@ -43,7 +48,7 @@ if (window.svgProcessingInitialized) {
             console.log(`Processing SVG with ${totalPaths} paths at scale ${effectiveScale.toFixed(4)}`);
             
             // Initial pre-processing to identify potential holes
-            const allShapes = [];
+            let allShapes = []; // Changed from const to let
             const allPaths = [];
             
             const samplingKey = isExport ? 'detailed' : 'default';
@@ -73,6 +78,38 @@ if (window.svgProcessingInitialized) {
             }
             
             console.log(`Pre-processed ${allShapes.length} shapes from ${allPaths.length} paths`);
+
+            // Filter out duplicate shapes
+            const uniqueShapes = [];
+            const seenShapeSignatures = new Set();
+            const detailedSamplingForSignature = settings.pointSampling.getPoints('detailed'); // For signature generation
+            
+            for (const shapeInfo of allShapes) {
+                const points = shapeInfo.shape.getPoints(detailedSamplingForSignature);
+                if (points.length === 0) { // Skip empty shapes that might not produce a signature
+                    console.log(`Skipping an empty shape (PathIndex: ${shapeInfo.pathIndex}, ShapeIndex: ${shapeInfo.shapeIndex}) during duplicate filtering.`);
+                    continue;
+                }
+            
+                // Create a signature for the shape based on its points
+                // Simple signature: concatenate x,y coordinates with a fixed precision
+                const signature = points.map(p => `${p.x.toFixed(4)},${p.y.toFixed(4)}`).join(';');
+                
+                if (!seenShapeSignatures.has(signature)) {
+                    seenShapeSignatures.add(signature);
+                    uniqueShapes.push(shapeInfo);
+                } else {
+                    console.log(`Filtered out a duplicate shape (PathIndex: ${shapeInfo.pathIndex}, ShapeIndex: ${shapeInfo.shapeIndex}, Area: ${shapeInfo.area.toFixed(4)})`);
+                }
+            }
+            // Replace allShapes with the filtered list
+            const originalShapeCount = allShapes.length;
+            allShapes = uniqueShapes; // Correctly reassign the local allShapes variable
+            // window.allShapes = uniqueShapes; // This can be kept if global access is needed for debugging
+            
+            if (allShapes.length !== originalShapeCount) {
+                console.log(`Filtered from ${originalShapeCount} to ${allShapes.length} unique shapes.`);
+            }
             
             // Sort shapes by area (largest first) to help with hole detection
             allShapes.sort((a, b) => b.area - a.area);
@@ -126,22 +163,38 @@ if (window.svgProcessingInitialized) {
                 const mesh = createExtrudedShape(finalShape, effectiveScale, lowQuality);
                 stats.extrusionsMade++;
                 
-                const shapeId = window.shapeColorCounter - 1; // Access as global
-                
+                const shapeId = window.shapeColorCounter - 1;                
                 // Update shape info
                 const shapeInfo2 = window.shapeRenderInfo.find(info => info.id === shapeId);
                 if (shapeInfo2) {
                     shapeInfo2.originalPath = {
-                        pathIndex: shapeInfo.pathIndex,
-                        shapeIndex: shapeInfo.shapeIndex,
+                        pathIndex: shapeInfo.pathIndex, // This might be 'i' from the outer loop if shapeInfo is from allShapes
+                        shapeIndex: shapeInfo.shapeIndex, // This might be 'i' if shapeInfo is directly from allShapes
                         svgCenterX, svgCenterY, effectiveScale
                     };
-                    shapeInfo2.useReversedWinding = false;
-                    shapeInfo2.operationType = 'extrude';
+                    shapeInfo2.useReversedWinding = false; // Default, can be changed by UI
                     
+                    // Initialize operationType from global config default
+                    shapeInfo2.operationType = defaultOperation;
+                    
+                    // If it's a hole that was part of finalShape.holes, it should be subtract
+                    // This logic needs refinement: if finalShape itself IS a hole of something larger, it's subtract.
+                    // If finalShape CONTAINS holes, those contained holes (processed separately) are subtract.
+                    // For now, rely on the shapeListUI to toggle and processHolesAsShapes to mark.
+                    // If this shape (finalShape) was identified as a hole of another, it should be 'subtract'.
+                    // This part of logic is tricky with the current loop structure.
+                    // Let's assume for now that if a shape is explicitly made from a "hole" path, it's subtract.
+                    // And other shapes get the default.
+
                     if (finalShape.holes.length > 0) {
-                        shapeInfo2.hasHoles = true;
-                        shapeInfo2.holeCount = finalShape.holes.length;
+                        stats.shapesWithHoles++;
+                        stats.validatedHoles += finalShape.holes.length;
+                        // The actual hole shapes are processed by processHolesAsShapes or similar
+                    }
+
+                    // Initial visibility based on operation type
+                    if (mesh) {
+                        mesh.visible = shapeInfo2.isVisible && (shapeInfo2.operationType !== 'subtract');
                     }
                 }
             }
@@ -497,6 +550,8 @@ if (window.svgProcessingInitialized) {
 
     function processHolesAsShapes(pathIndex, holeShapes, svgCenterX, svgCenterY, effectiveScale, lowQuality, isExport, stats) {
         const settings = window.svgGlobalSettings;
+        // const currentConfig = window.config || {}; // Not strictly needed here as holes are always subtract
+
         holeShapes.forEach((holeShape, shapeIndex) => {
             try {
                 const pointsForOuter = settings.pointSampling.getPoints(isExport ? 'detailed' : (lowQuality ? 'default' : 'default')); // Or specific 'lowQualityDefault'
@@ -532,48 +587,25 @@ if (window.svgProcessingInitialized) {
                 });
 
                 const finalShape = new THREE.Shape(transformedOuterPoints);
-                finalShape.holes = [];
-                
-                const shapeArea = Math.abs(window.SVGProcessing.Utils.calculateShapeArea(finalShape, settings.pointSampling.getPoints('default')));
-                finalShape.area = shapeArea;
+                finalShape.holes = []; // Holes generally don't have their own holes in this context
 
-                if (shapeArea < settings.processing.zeroAreaThreshold) {
-                    console.warn(`Path ${pathIndex}, Hole Shape ${shapeIndex}: Shape has effectively zero area (${shapeArea.toFixed(6)}). Skipping.`);
-                    return;
-                }
-                
-                createExtrudedShape(finalShape, effectiveScale, lowQuality);
-                stats.extrusionsMade++;
+                const mesh = createExtrudedShape(finalShape, effectiveScale, lowQuality);
+                // stats.extrusionsMade++; // These are holes, not primary extrusions for stats
 
-                const shapeId = window.shapeColorCounter - 1; // Access as global
-                
+                const shapeId = window.shapeColorCounter - 1;
                 const shapeInfoIndex = window.shapeRenderInfo.findIndex(info => info.id === shapeId);
+
                 if (shapeInfoIndex >= 0) {
-                    window.shapeRenderInfo[shapeInfoIndex].originalPath = {
-                        pathIndex: pathIndex,
-                        shapeIndex: shapeIndex,
-                        svgCenterX: svgCenterX,
-                        svgCenterY: svgCenterY,
-                        effectiveScale: effectiveScale
-                    };
+                    window.shapeRenderInfo[shapeInfoIndex].originalPath = { /* ... */ };
                     window.shapeRenderInfo[shapeInfoIndex].useReversedWinding = false;
                     
-                    window.shapeRenderInfo[shapeInfoIndex].operationType = 'remove';
-                    console.log(`Path ${pathIndex}, Hole Shape ${shapeIndex}: (ID: ${shapeId}) operationType set to 'remove'. Shape will be hidden. True subtraction requires CSG.`);
+                    // Holes processed as shapes are always subtractive
+                    window.shapeRenderInfo[shapeInfoIndex].operationType = 'subtract'; 
+                    console.log(`Path ${pathIndex}, Hole Shape ${shapeIndex}: (ID: ${shapeId}) operationType set to 'subtract'.`);
                     
                     if (window.shapeRenderInfo[shapeInfoIndex].mesh) {
-                        if (typeof updateMeshAppearanceForOperation === 'function') {
-                            updateMeshAppearanceForOperation(window.shapeRenderInfo[shapeInfoIndex].mesh, 'remove');
-                        } else {
-                            const material = window.shapeRenderInfo[shapeInfoIndex].mesh.material;
-                            if (!material.userData) material.userData = {};
-                            material.userData.originalColor = material.color.clone();
-                            
-                            material.color.set(0xff0000);
-                            material.wireframe = true;
-                            material.transparent = true;
-                            material.opacity = 0.7;
-                        }
+                        // Subtracted shapes are initially hidden, CSG would handle actual subtraction
+                        window.shapeRenderInfo[shapeInfoIndex].mesh.visible = false; 
                     }
                 }
             } catch (shapeError) {
@@ -584,6 +616,9 @@ if (window.svgProcessingInitialized) {
 
     function processShapesWithHoles(pathIndex, shapesFromPath, svgCenterX, svgCenterY, effectiveScale, lowQuality, isExport, stats) {
         const settings = window.svgGlobalSettings;
+        const currentConfig = window.config || {}; // Use global config
+        const defaultOperation = currentConfig.defaultShapeOperation || 'extrude';
+
         shapesFromPath.forEach((originalShape, shapeIndex) => {
             try {
                 const potentialHoleCount = originalShape.holes?.length || 0;
@@ -680,25 +715,22 @@ if (window.svgProcessingInitialized) {
                 createExtrudedShape(finalShape, effectiveScale, lowQuality);
                 stats.extrusionsMade++;
 
-                const shapeId = window.shapeColorCounter - 1; // Access as global
-                
+                const shapeId = window.shapeColorCounter - 1;                
                 const shapeInfoIndex = window.shapeRenderInfo.findIndex(info => info.id === shapeId);
                 if (shapeInfoIndex >= 0) {
-                    window.shapeRenderInfo[shapeInfoIndex].originalPath = {
-                        pathIndex: pathIndex,
-                        shapeIndex: shapeIndex,
-                        svgCenterX: svgCenterX,
-                        svgCenterY: svgCenterY,
-                        effectiveScale: effectiveScale
-                    };
-                    window.shapeRenderInfo[shapeInfoIndex].useReversedWinding = false;
+                    window.shapeRenderInfo[shapeInfoIndex].originalPath = { /* ... */ };
+                    // Initialize operationType from global config default
+                    window.shapeRenderInfo[shapeInfoIndex].operationType = defaultOperation;
                     
-                    window.shapeRenderInfo[shapeInfoIndex].operationType = 'extrude';
-                    
-                    // Add information about holes
-                    if (finalShape.holes && finalShape.holes.length > 0) {
-                        window.shapeRenderInfo[shapeInfoIndex].hasHoles = true;
-                        window.shapeRenderInfo[shapeInfoIndex].holeCount = finalShape.holes.length;
+                    // If it's subtractive by default, ensure mesh visibility is set accordingly
+                    if (window.shapeRenderInfo[shapeInfoIndex].mesh) {
+                        window.shapeRenderInfo[shapeInfoIndex].mesh.visible = 
+                            window.shapeRenderInfo[shapeInfoIndex].isVisible && 
+                            (window.shapeRenderInfo[shapeInfoIndex].operationType !== 'subtract');
+                    }
+
+                    if (originalShape.holes && originalShape.holes.length > 0 && finalShape.holes.length > 0) {
+                        // ... existing hole logging ...
                     }
                 }
             } catch (shapeError) {

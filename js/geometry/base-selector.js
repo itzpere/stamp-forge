@@ -138,8 +138,9 @@ function createDesignCard(design) {
     preview.dataset.stlFile = design.file;
     
     const canvas = document.createElement('canvas');
-    canvas.width = 280; 
-    canvas.height = 220; 
+    // Increase canvas size for better rendering quality
+    canvas.width = 400; 
+    canvas.height = 300;
     preview.appendChild(canvas);
     
     const title = document.createElement('div');
@@ -213,8 +214,10 @@ function initPreviewRenderer(canvas, stlFile) {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xf5f5f5);
     
-    const camera = new THREE.PerspectiveCamera(50, canvas.width / canvas.height, 0.1, 1000);
-    camera.position.set(0, 0, 30);
+    // Use more zoomed-in perspective with smaller field of view
+    const camera = new THREE.PerspectiveCamera(40, canvas.width / canvas.height, 0.1, 1000);
+    // Position camera closer to the model
+    camera.position.set(0, 0, 25);
     
     const renderer = new THREE.WebGLRenderer({ 
         canvas: canvas,
@@ -223,12 +226,18 @@ function initPreviewRenderer(canvas, stlFile) {
     });
     renderer.setSize(canvas.width, canvas.height);
     
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    // Improve lighting for better preview
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     scene.add(ambientLight);
     
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
     directionalLight.position.set(5, 10, 7);
     scene.add(directionalLight);
+    
+    // Add a second directional light from another angle
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    fillLight.position.set(-5, 5, -7);
+    scene.add(fillLight);
     
     let mesh = null;
     
@@ -251,7 +260,8 @@ function initPreviewRenderer(canvas, stlFile) {
         const size = new THREE.Vector3();
         boundingBox.getSize(size);
         const maxDim = Math.max(size.x, size.y, size.z);
-        const scale = 10 / maxDim;
+        // Increase scale factor for larger preview
+        const scale = 12 / maxDim;
         mesh.scale.set(scale, scale, scale);
         
         scene.add(mesh);
@@ -261,7 +271,8 @@ function initPreviewRenderer(canvas, stlFile) {
         const animationId = requestAnimationFrame(animate);
         
         if (mesh) {
-            mesh.rotation.y += 0.015;
+            // Slow down rotation for a more elegant preview
+            mesh.rotation.y += 0.01;
         }
         
         renderer.render(scene, camera);

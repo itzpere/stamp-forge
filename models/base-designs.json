@@ -14,21 +14,6 @@
           "z": 0
         }
       }
-    },
-    {
-      "id": "swappable",
-      "title": "Swappable Stamp",
-      "file": "models/swappable_stamp.stl",
-      "config": {
-        "width": 20,
-        "height": 3,
-        "depth": 20,
-        "rotation": {
-          "x": 270,
-          "y": 0,
-          "z": 0
-        }
-      }
     }
   ]
 }

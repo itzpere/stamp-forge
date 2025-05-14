@@ -18,8 +18,6 @@
   "author": "Petar Miletić",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.17.1",
-    "svgo": "^3.0.2",
-    "three-csg-ts": "^3.1.10"
+    "express": "^4.17.1"
   }
 }

@@ -61,6 +61,12 @@ window.StampForgeConfig = {
     }
 };
 
+// Initialize default global variables for backward compatibility
+window.svgScaleFactor = window.StampForgeConfig.svg.scale;
+window.extrusionPosition = window.StampForgeConfig.extrusion.position;
+window.autoSetYOffset = window.StampForgeConfig.extrusion.autoSetYOffset;
+window.extrusionHeight = window.StampForgeConfig.extrusion.height;
+
 // Provide getters/setters for backward compatibility with existing code
 // This allows old code to still work while we transition to the new configuration system
 Object.defineProperties(window, {
@@ -140,6 +146,45 @@ Object.defineProperties(window, {
             if (!window.StampForgeConfig.svg) window.StampForgeConfig.svg = {};
             if (value && typeof value === 'object') {
                 window.StampForgeConfig.svg.holeDetection = Object.assign(window.StampForgeConfig.svg.holeDetection || {}, value);
+            }
+        }
+    },
+    
+    // Update global config with better support for SVG properties
+    'applyGlobalConfig': {
+        value: function(newConfig) {
+            // Merge new config into the global config
+            if (newConfig) {
+                // Handle special properties that need copying instead of reference assignment
+                if (newConfig.extrusion && newConfig.extrusion.position) {
+                    window.StampForgeConfig.extrusion.position = {
+                        x: newConfig.extrusion.position.x || 0,
+                        y: newConfig.extrusion.position.y || 0,
+                        z: newConfig.extrusion.position.z || 0
+                    };
+                }
+                
+                // Deep merge for other properties
+                if (newConfig.svg) {
+                    Object.assign(window.StampForgeConfig.svg, newConfig.svg);
+                }
+                
+                if (newConfig.extrusion) {
+                    if (newConfig.extrusion.height !== undefined) {
+                        window.StampForgeConfig.extrusion.height = newConfig.extrusion.height;
+                    }
+                    if (newConfig.extrusion.autoSetYOffset !== undefined) {
+                        window.StampForgeConfig.extrusion.autoSetYOffset = newConfig.extrusion.autoSetYOffset;
+                    }
+                }
+                
+                // Update the global variables for backward compatibility
+                window.svgScaleFactor = window.StampForgeConfig.svg.scale;
+                window.extrusionPosition = window.StampForgeConfig.extrusion.position;
+                window.autoSetYOffset = window.StampForgeConfig.extrusion.autoSetYOffset;
+                window.extrusionHeight = window.StampForgeConfig.extrusion.height;
+                
+                console.log("Global config updated:", window.StampForgeConfig);
             }
         }
     }

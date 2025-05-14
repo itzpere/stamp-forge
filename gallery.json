@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2025-05-13T22:46:54.202Z",
+  "lastUpdated": "2025-05-14T23:27:09.376Z",
   "svgs": [
     {
       "name": "achievement-award-trophy-svgrepo-com.svg",
@@ -524,16 +524,9 @@
     {
       "name": "default_stamp_base.stl",
       "path": "models/default_stamp_base.stl",
-      "size": 1684,
-      "modified": "2025-05-13T13:07:31.951Z",
+      "size": 1884,
+      "modified": "2025-05-14T23:00:38.581Z",
       "url": "models/default_stamp_base.stl"
-    },
-    {
-      "name": "swappable_stamp.stl",
-      "path": "models/swappable_stamp.stl",
-      "size": 35484,
-      "modified": "2025-05-13T19:09:32.450Z",
-      "url": "models/swappable_stamp.stl"
     }
   ]
 }
