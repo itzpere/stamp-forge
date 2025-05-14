@@ -5,95 +5,122 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StampForge</title>
     <link rel="stylesheet" href="styles.css">
-    <!-- Three.js library -->
+    <!-- Third-party libraries -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
-    <!-- OrbitControls for camera manipulation -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
-    <!-- STL exporter -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/exporters/STLExporter.js"></script>
-    <!-- SVGLoader -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/SVGLoader.js"></script>
-    <!-- BufferGeometryUtils (needed for CSG optimization) -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/utils/BufferGeometryUtils.js"></script>
-    <!-- Our simple CSG implementation -->
-    <script src="js/ThreeCSG.js"></script>
-    
-    <!-- App JavaScript Files - Load in this order -->
-    <script src="js/globals.js"></script>
-    <script src="js/utilities.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/STLLoader.js"></script>
+
+    <!-- Application Core Scripts -->
+    <script src="js/core/globals.js"></script>
+    <script src="js/core/config.js"></script>
+    <script src="js/utils/errorHandling.js"></script>
+    <script src="js/utils/debug.js"></script> <!-- Add our new debug script -->
+    <script src="js/core/moduleInit.js"></script> <!-- Initializes namespaces -->
+    <script src="js/utils/utilities.js"></script> 
+    <script src="js/ui/uiManager.js"></script>
     <script src="js/rendering.js"></script>
-    <script src="js/geometry.js"></script>
-    <script src="js/svgProcessing.js"></script>
+    <script src="js/geometry/geometry.js"></script>
     <script src="js/exportUtils.js"></script>
-    <script src="js/uiControls.js"></script>
-    <script src="js/main.js"></script>
+    <script src="js/geometry/base-selector.js"></script>
+    <script src="js/gallery/gallery.js"></script>
+    <script src="js/ui/shapeListUI.js"></script>
+    <script src="js/geometry/brickImport.js"></script>
+    
+    <!-- Main application logic -->
+    <script src="js/core/main.js"></script>
+    
+    <!-- Dynamic SVG module loader - loads the 5 scripts above when needed -->
+    <script src="js/core/index.js"></script>
 </head>
 <body>
     <div class="container">
         <h1>StampForge <span class="alpha-badge">ALPHA VERSION</span></h1>
         
-        <div class="main-content">
-            <div class="controls-panel">
+        <div class="viewer-and-shape-list-container">
+            <div class="full-width-viewer">
+                <div id="preview-container">
+                    <div id="three-container"></div>
+                    <div id="loading" class="hidden">Loading...</div>
+                    <div id="shapeListPanel" class="shape-list-panel">
+                        <h3>SVG Shapes</h3>
+                        <div id="shapeListContent" class="shape-list-content">
+                            <p class="no-shapes-message">No SVG loaded or no shapes found.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="control-sections">
+            <div class="control-section extrusion-section">
+                <h3>Design</h3>
                 <div class="file-upload">
-                    <h3>Upload SVG File</h3>
+                    <label for="svgUpload">Upload Your SVG Design</label>
+                    <label for="svgUpload" class="custom-file-upload">Choose File</label>
                     <input type="file" id="svgUpload" accept=".svg">
                 </div>
-                
-                <div class="extrusion-controls control-group">
-                    <h3>Extrusion Properties</h3>
-
-                    <div class="control-row">
-                        <label for="svgScale">Scale:</label>
-                        <input type="number" id="svgScale" min="0.01" max="1" step="0.01" value="0.2">
-                    </div>
-                                        
-                    <div class="position-label">Position Offset:</div>
-                    <div class="position-controls">
-                        <label for="extrusionX">X:</label>
-                        <input type="number" id="extrusionX" min="-10" max="10" step="0.1" value="0">
-                        
-                        <label for="extrusionY">Y:</label>
-                        <input type="number" id="extrusionY" min="-10" max="10" step="0.1" value="0.6">
-                        
-                        <label for="extrusionZ">Z:</label>
-                        <input type="number" id="extrusionZ" min="-10" max="10" step="0.1" value="0">
-                    </div>
-                </div>
-                
-                <div class="action-buttons">
-                    <a href="https://www.printables.com/model/1285748-stampforge-customizable-svg-to-stamp" target="_blank" id="downloadHolder" class="prominent-button">Download Stamp Holder</a>
-                    <button id="downloadSTL" disabled>Download STL</button>
-                    
-                    <!-- View buttons now include reset view button -->
-                    <div class="view-buttons">
-                        <button id="resetView">Reset View</button>
-                        <button id="topView">Top</button>
-                        <button id="configBtn">⚙️ Config</button>
+                <div class="design-properties">
+                    <button class="accordion-header-svg" aria-expanded="false">
+                        <h4>SVG Properties</h4>
+                        <span class="accordion-icon-svg">+</span>
+                    </button>
+                    <div class="accordion-content-svg">
+                        <div class="control-row">
+                            <label for="svgScale">Scale:</label>
+                            <input type="number" id="svgScale" min="0.05" max="5.0" step="0.05" value="1" title="Adjust the size of the SVG design">
+                        </div>
+                        <div class="control-row">
+                            <input type="checkbox" id="svgAssumeCCW" checked>
+                            <label for="svgAssumeCCW" title="Assume Counter-Clockwise paths are exteriors. Uncheck if SVG holes/solids are inverted.">Assume CCW Exteriors</label>
+                        </div>
+                        <div class="control-row">
+                            <input type="checkbox" id="autoSetYOffset" checked>
+                            <label for="autoSetYOffset" title="Automatically set design Y offset to sit on top of the base. Uncheck for manual Y positioning.">Auto-adjust Design Y Offset</label>
+                        </div>
+                        <div class="position-label">Position (Offset from Base Top):</div>
+                        <div class="position-controls">
+                            <div class="control-row"><label for="extrusionX">X:</label><input type="number" id="extrusionX" min="-20" max="20" step="0.1" value="0"></div>
+                            <div class="control-row"><label for="extrusionY">Y:</label><input type="number" id="extrusionY" min="-10" max="10" step="0.1" value="0.0"></div>
+                            <div class="control-row"><label for="extrusionZ">Z:</label><input type="number" id="extrusionZ" min="-20" max="20" step="0.1" value="0"></div>
+                        </div>
                     </div>
                 </div>
             </div>
             
-            <div id="preview-container">
-                <div id="three-container"></div>
-                <div id="loading" class="hidden">Loading...</div>
+            <div class="control-section base-section">
+                <h3>Base</h3>
+                <div class="base-controls"><button id="chooseBaseBtn" class="choose-base-btn">Choose Base Design</button></div>
+                <div class="quick-controls"><div class="control-row"><label for="brickColor">Color:</label><input type="color" id="brickColor" value="#bc8f8f"></div></div>
+                <div class="rotation-controls">
+                    <div class="control-label">Rotation:</div>
+                    <div class="rotation-buttons">
+                        <button id="rotateXBtn" class="rotation-btn" title="Rotate around X-axis">X</button>
+                        <button id="rotateYBtn" class="rotation-btn" title="Rotate around Y-axis">Y</button>
+                        <button id="rotateZBtn" class="rotation-btn" title="Rotate around Z-axis">Z</button>
+                        <button id="resetRotationBtn" class="rotation-btn reset-btn" title="Reset rotation">Reset</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="control-section options-section">
+                <h3>Options</h3>
+                <div class="action-buttons">
+                    <button id="downloadSTL" class="action-button large-action-button" disabled>Download STL</button>
+                    <a href="https://www.printables.com/model/1285748-stampforge-customizable-svg-to-stamp" target="_blank" id="downloadHolder" class="action-button prominent-button">Download Stamp Holder</a>
+                </div>
+                <div class="view-buttons">
+                    <button id="topView">Top View</button>
+                    <button id="sideView">Side View</button>
+                    <button id="configBtn" class="config-button">⚙️ Config</button>
+                </div>
             </div>
         </div>
         
-        <!-- Quick Guide moved below 3D viewer -->
-        <div class="quick-instructions">
-            <h3>Quick Guide</h3>
-            <ul>
-                <li>⬆️ Upload SVG above or select from gallery below</li>
-                <li>- Rotate: left-click drag</li>
-                <li>- Pan: right-click drag</li>
-                <li>- Zoom: scroll wheel</li>
-            </ul>
-        </div>
-        
-        <!-- SVG Gallery Section -->
         <div class="svg-gallery-section">
             <h3>SVG Gallery</h3>
-            <p class="gallery-info">Click on an SVG to load it</p>
             <div id="svg-gallery" class="svg-gallery">
                 <div id="gallery-loading" class="gallery-loading">Loading gallery...</div>
                 <div id="gallery-error" class="gallery-error hidden"></div>
@@ -101,117 +128,54 @@
             </div>
         </div>
         
-        <!-- About & Resources section without accordion -->
         <div class="about-resources">
             <h3>About & Resources</h3>
             <div class="info-grid">
-                <div class="info-section">
-                    <h4>About This Project</h4>
-                    <p>StampForge is an open-source tool for creating 3D models from SVG files, designed for easy 3D printing of custom stamps.</p>
-                    <div class="author-info">
-                        <p><strong>Created by:</strong> Petar Miletić</p>
-                        <p><a href="https://github.com/itzpere" target="_blank"><img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" class="github-icon" alt="GitHub"> github.com/itzpere</a></p>
+                <div class="info-section"><h4>About This Project</h4><p>StampForge is an open-source tool...</p><div class="author-info"><p><strong>Created by:</strong> Petar Miletić</p><p><a href="https://github.com/itzpere" target="_blank"><img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" class="github-icon" alt="GitHub"> github.com/itzpere</a></p></div></div>
+                <div class="info-section"><h4>Printing Tips</h4><ul><li><strong>Recommended:</strong> Enable <em>ironing</em>...</li><li><strong>Recommended:</strong> Print this part in TPU...</li></ul></div>
+                <div class="info-section highlight-section"><h4>Essential Resources</h4><ul><li><a href="https://www.svgrepo.com/" target="_blank">SVG Repo</a>...</li><li class="highlight-item"><a href="https://www.printables.com/model/1285748-stampforge-customizable-svg-to-stamp" target="_blank" class="prominent-link">Download Stamp Holder</a></li><li><a href="https://www.printables.com/model/1285748-stampforge-customizable-svg-to-stamp" target="_blank">Printables Page</a></li><li><a href="https://github.com/itzpere/stamp-forge" target="_blank">GitHub Repository</a></li></ul></div>
+            </div>
+        </div>
+        
+        <div id="configModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header"><h2>Configuration</h2><span class="close">&times;</span></div>
+                <div class="modal-body">
+                    <div class="config-section"><h3>Base Settings</h3><div class="control-row"><label for="modalBrickColor">Color:</label><input type="color" id="modalBrickColor" value="#bc8f8f"></div><div class="control-row"><label for="brickWidth">Width:</label><input type="number" id="brickWidth" min="5" max="50" step="1" value="20"></div><div class="control-row"><label for="brickHeight">Height:</label><input type="number" id="brickHeight" min="1" max="10" step="0.5" value="3"></div><div class="control-row"><label for="brickDepth">Depth:</label><input type="number" id="brickDepth" min="5" max="50" step="1" value="20"></div></div>
+                    <div class="config-section"><h3>Quality Settings</h3><div class="control-row"><label for="maxQuality">Interactive Quality:</label><input type="range" id="maxQuality" min="0.2" max="1" step="0.1" value="0.7"><span id="qualityValue">0.7</span></div><div class="control-row"><label for="svgResolution">SVG Resolution:</label><input type="range" id="svgResolution" min="0.5" max="2" step="0.1" value="1"><span id="resolutionValue">1.0</span></div></div>
+                    <div class="config-section"><h3>Export Settings</h3><div class="control-row"><label for="exportBevel">Bevel Edges:</label><input type="checkbox" id="exportBevel" checked></div><div class="control-row"><label for="exportSteps">Extrude Steps:</label><input type="number" id="exportSteps" min="1" max="10" step="1" value="6"></div></div>
+                    <div class="config-section">
+                        <h3>Hole Detection Settings</h3>
+                        <div class="control-row">
+                            <label for="holeAggressiveness">Aggressiveness:</label>
+                            <input type="range" id="holeAggressiveness" min="0.1" max="1" step="0.1" value="0.7">
+                            <span id="holeAggressivenessValue">0.7</span>
+                        </div>
+                        <div class="control-row">
+                            <label for="holeAreaRatio">Max Area Ratio:</label>
+                            <input type="range" id="holeAreaRatio" min="0.1" max="0.9" step="0.1" value="0.5">
+                            <span id="holeAreaRatioValue">0.5</span>
+                        </div>
+                        <div class="control-row">
+                            <label for="holePointsInside">Points Inside Threshold:</label>
+                            <input type="range" id="holePointsInside" min="0.4" max="0.9" step="0.1" value="0.6">
+                            <span id="holePointsInsideValue">0.6</span>
+                        </div>
                     </div>
                 </div>
-                
-                <div class="info-section">
-                    <h4>Printing Tips</h4>
-                    <ul>
-                        <li><strong>Recommended:</strong> Enable <em>ironing</em> for a smooth finish</li>
-                        <li><strong>Recommended:</strong> Print this part in TPU if available else press hard and long</li>
-                    </ul>
-                </div>
-                
-                <div class="info-section highlight-section">
-                    <h4>Essential Resources</h4>
-                    <ul>
-                        <li class="highlight-item"><a href="https://www.printables.com/model/1285748-stampforge-customizable-svg-to-stamp" target="_blank" class="prominent-link">Download Stamp Holder</a></li>
-                        <li><a href="https://www.printables.com/model/1285748-stampforge-customizable-svg-to-stamp" target="_blank">Printables Page</a></li>
-                        <li><a href="https://github.com/itzpere/stamp-forge" target="_blank">GitHub Repository</a></li>
-                    </ul>
-                </div>
-                
-                <div class="info-section">
-                    <h4>SVG Resources</h4>
-                    <ul>
-                        <li><a href="https://www.svgrepo.com/" target="_blank">SVG Repo</a> - Free SVG icons and vectors</li>
-                        <li><a href="https://www.svgrepo.com/collection/chunk-16px-thick-interface-icons/" target="_blank">Chunk 16px Icons</a></li>
-                    </ul>
+                <div class="modal-footer"><button id="resetConfigBtn">Reset to Defaults</button><button id="applyConfigBtn">Apply Changes</button></div>
+            </div>
+        </div>
+        
+        <div id="baseSelectModal" class="modal">
+            <div class="modal-content base-select-content">
+                <div class="modal-header"><h2>Choose Base Design</h2><span class="close">&times;</span></div>
+                <div class="modal-body">
+                    <div class="welcome-message"><h3>Welcome to StampForge!</h3><p>Select a base design...</p></div>
+                    <div class="base-designs-grid" id="baseDesignsGrid"></div>
                 </div>
             </div>
         </div>
     </div>
-    
-    <!-- Configuration Modal -->
-    <div id="configModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Configuration</h2>
-                <span class="close">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="config-section">
-                    <h3>Colors</h3>
-                    <div class="control-row">
-                        <label for="brickColor">Brick Color:</label>
-                        <input type="color" id="brickColor" value="#bc8f8f">
-                    </div>
-                </div>
-
-                <div class="config-section">
-                    <h3>Brick Dimensions</h3>
-                    <div class="control-row">
-                        <label for="brickWidth">Width:</label>
-                        <input type="number" id="brickWidth" min="5" max="50" step="1" value="20">
-                    </div>
-                    <div class="control-row">
-                        <label for="brickHeight">Height:</label>
-                        <input type="number" id="brickHeight" min="1" max="10" step="0.1" value="3">
-                    </div>
-                    <div class="control-row">
-                        <label for="brickDepth">Depth:</label>
-                        <input type="number" id="brickDepth" min="5" max="50" step="1" value="20">
-                    </div>
-                </div>
-
-                <div class="config-section">
-                    <h3>Quality Settings</h3>
-                    <div class="control-row">
-                        <label for="maxQuality">Interactive Quality:</label>
-                        <input type="range" id="maxQuality" min="0.2" max="1" step="0.1" value="0.7">
-                        <span id="qualityValue">0.7</span>
-                    </div>
-                    <div class="control-row">
-                        <label for="svgResolution">SVG Resolution:</label>
-                        <input type="range" id="svgResolution" min="0.5" max="2" step="0.1" value="1">
-                        <span id="resolutionValue">1.0</span>
-                    </div>
-                </div>
-                
-                <div class="config-section">
-                    <h3>Export Settings</h3>
-                    <div class="control-row">
-                        <label for="exportBevel">Bevel Edges:</label>
-                        <input type="checkbox" id="exportBevel" checked>
-                    </div>
-                    <div class="control-row">
-                        <label for="exportSteps">Extrude Steps:</label>
-                        <input type="number" id="exportSteps" min="1" max="10" step="1" value="6">
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="resetConfigBtn">Reset to Defaults</button>
-                <button id="applyConfigBtn">Apply Changes</button>
-            </div>
-        </div>
-    </div>
-    
-    <div class="development-notice">
-        This is an alpha version. I'm actively working on improving stability and features.
-    </div>
-    
-    <!-- Add script to load gallery -->
-    <script src="js/gallery.js"></script>
 </body>
 </html>

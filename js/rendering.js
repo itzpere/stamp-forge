@@ -1,186 +1,157 @@
-// Initialize the Three.js scene
-function initScene() {
-    // Create scene with proper background
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf0f0f0); // Light gray background
-    
-    // Create camera with improved settings
-    camera = new THREE.PerspectiveCamera(
-        60, // Field of view
-        window.innerWidth / window.innerHeight,
-        0.1, // Near plane (avoid too small values)
-        1000
-    );
-    
-    // Set initial camera position to a safe default
-    camera.position.set(0, 20, 30); // Position that should show the scene
-    camera.lookAt(0, 0, 0);
-    
-    // Create renderer with proper settings
-    renderer = new THREE.WebGLRenderer({ 
-        antialias: true,
-        powerPreference: "high-performance"
-    });
-    
-    const container = document.getElementById('three-container');
-    if (!container) {
-        console.error("Could not find three-container element!");
-        return;
-    }
-    
-    renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(window.devicePixelRatio > 1 ? 2 : 1);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    
-    // Add renderer to DOM
-    container.appendChild(renderer.domElement);
-    
-    // Add lights - CRITICAL FOR VISIBILITY
-    setupLights();
-    
-    // Set up orbit controls
-    controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.15;
-    controls.rotateSpeed = 0.8;
-    controls.panSpeed = 0.8;
-    controls.screenSpacePanning = true;
-    controls.minDistance = 5;
-    controls.maxDistance = 100;
-    
-    // Add a grid helper for reference
-    const gridHelper = new THREE.GridHelper(50, 50, 0x888888, 0x444444);
-    scene.add(gridHelper);
-    
-    // Handle window resize
-    window.addEventListener('resize', onWindowResize);
-    
-    // Log successful initialization
-    console.log("Three.js scene initialized successfully");
-}
+window.scene = window.scene || null;
+window.camera = window.camera || null;
+window.renderer = window.renderer || null;
+window.controls = window.controls || null;
 
-// Set up scene lighting
-function setupLights() {
-    // Clear any existing lights
-    scene.children.forEach(child => {
-        if (child.isLight) scene.remove(child);
-    });
-    
-    // Ambient light - essential for overall visibility
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambientLight);
-    
-    // Main directional light (like sunlight)
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(20, 35, 25);
-    directionalLight.castShadow = true;
-    
-    // Configure shadow properties
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
-    directionalLight.shadow.camera.near = 0.5;
-    directionalLight.shadow.camera.far = 500;
-    directionalLight.shadow.camera.left = -50;
-    directionalLight.shadow.camera.right = 50;
-    directionalLight.shadow.camera.top = 50;
-    directionalLight.shadow.camera.bottom = -50;
-    
-    scene.add(directionalLight);
-    
-    // Additional fill light for better visibility
-    const fillLight = new THREE.DirectionalLight(0xffffff, 0.4); // Increased intensity
-    fillLight.position.set(-20, 15, -15);
-    scene.add(fillLight);
-    
-    console.log("Lights set up successfully");
-}
-
-// Animation loop with error handling
-function animate() {
+window.initScene = function() {
     try {
-        requestAnimationFrame(animate);
+        window.scene = new THREE.Scene();
+        window.scene.background = new THREE.Color(0xf0f0f0);
         
-        // Update controls for smooth damping effect
-        if (controls) controls.update();
+        window.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        window.camera.position.set(0, 20, 30);
+        window.camera.lookAt(0, 0, 0);
         
-        // Render scene with camera
-        if (renderer && scene && camera) {
-            renderer.render(scene, camera);
-        }
-    } catch (error) {
-        console.error("Error in animation loop:", error);
-    }
-}
-
-// Enhanced window resize handler
-function onWindowResize() {
-    const container = document.getElementById('three-container');
-    camera.aspect = container.clientWidth / container.clientHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(container.clientWidth, container.clientHeight);
-}
-
-// New function: Move camera to view the entire scene safely
-function fitCameraToObject() {
-    try {
-        // Check if we have objects to fit
-        if (!brick) {
-            console.warn("No brick found for camera fitting");
-            // Use default position as fallback
-            camera.position.set(0, 20, 30);
-            camera.lookAt(0, 0, 0);
-            controls.target.set(0, 0, 0);
-            controls.update();
+        const container = document.getElementById('three-container');
+        if (!container) {
+            console.error("Could not find three-container element");
             return;
         }
         
-        // Calculate bounding box of all objects
-        const boundingBox = new THREE.Box3();
+        window.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        window.renderer.setPixelRatio(window.devicePixelRatio);
+        window.renderer.setSize(container.clientWidth, container.clientHeight);
+        container.appendChild(window.renderer.domElement);
         
-        // Add brick and triangles to bounding calculation
-        boundingBox.expandByObject(brick);
-        if (triangleMesh) boundingBox.expandByObject(triangleMesh);
-        if (mirrorTriangleMesh) boundingBox.expandByObject(mirrorTriangleMesh);
+        window.controls = new THREE.OrbitControls(window.camera, window.renderer.domElement);
+        window.controls.addEventListener('change', window.render);
+        window.controls.enableDamping = true;
+        window.controls.dampingFactor = 0.25;
         
-        // Add all extrusions to bounding calculation
-        if (extrudedGroup && extrudedGroup.children.length > 0) {
-            boundingBox.expandByObject(extrudedGroup);
-        }
+        setupLights();
         
-        // Get bounding sphere
-        const boundingSphere = new THREE.Sphere();
-        boundingBox.getBoundingSphere(boundingSphere);
+        window.addEventListener('resize', onWindowResize);
         
-        // Get center and radius
-        const center = boundingSphere.center;
-        const radius = boundingSphere.radius || 10; // Fallback radius if bounding calculation fails
-        
-        // Position camera based on object size, with a minimum distance
-        const offset = Math.max(radius * 2.5, 15);
-        camera.position.set(
-            0,
-            center.y + offset,
-            center.z - offset
-        );
-        
-        // Look at center of objects
-        camera.lookAt(center);
-        controls.target.copy(center);
-        
-        // Update controls
-        controls.update();
-        
-        console.log("Camera positioned to fit objects:", {
-            center: center.toArray(),
-            radius,
-            cameraPosition: camera.position.toArray()
-        });
+        animate();
     } catch (error) {
-        console.error("Error fitting camera to object:", error);
-        // Use default position as fallback
-        camera.position.set(0, 20, 30);
-        camera.lookAt(0, 0, 0);
-        controls.update();
+        console.error("Error initializing Three.js scene:", error);
+    }
+};
+
+function setupLights() {
+    if (!window.scene) {
+        console.error("Scene not initialized");
+        return;
+    }
+    
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(10, 20, 15);
+    const backLight = new THREE.DirectionalLight(0xffffff, 0.4);
+    backLight.position.set(-5, 10, -10);
+    
+    window.scene.add(ambientLight);
+    window.scene.add(directionalLight);
+    window.scene.add(backLight);
+}
+
+function onWindowResize() {
+    if (!window.camera || !window.renderer) {
+        console.error("Camera or renderer not initialized");
+        return;
+    }
+    
+    const container = document.getElementById('three-container');
+    if (!container) {
+        console.error("Could not find three-container element");
+        return;
+    }
+    
+    window.camera.aspect = container.clientWidth / container.clientHeight;
+    window.camera.updateProjectionMatrix();
+    
+    window.renderer.setSize(container.clientWidth, container.clientHeight);
+    
+    window.render();
+}
+
+window.render = function() {
+    if (window.renderer && window.scene && window.camera) {
+        window.renderer.render(window.scene, window.camera);
+    }
+};
+
+window.animate = function() {
+    requestAnimationFrame(window.animate);
+    
+    if (window.controls) window.controls.update();
+    
+    if (window.controls && window.controls.enabled) {
+        window.render();
+    }
+    
+    protectFaceComponentPositions();
+};
+
+function protectFaceComponentPositions() {
+    if (window.extrudedGroup) {
+        window.extrudedGroup.traverse(child => {
+            if (child.isMesh && child.userData && child.userData.isPositionLocked) {
+                // Only fix if position was changed and targetPosition exists
+                if (child.userData.targetPosition) {
+                    const target = child.userData.targetPosition;
+                    const current = child.position;
+                    
+                    // Check if position was changed
+                    if (!current.equals(target)) {
+                        console.log(`Face component position reset from (${current.x.toFixed(2)}, ${current.y.toFixed(2)}, ${current.z.toFixed(2)}) to (${target.x.toFixed(2)}, ${target.y.toFixed(2)}, ${target.z.toFixed(2)})`);
+                        child.position.copy(target);
+                        child.updateMatrix();
+                    }
+                }
+            }
+        });
     }
 }
+
+window.fitCameraToObject = function(offset = 1.5) {
+    if (!window.scene || !window.camera) return;
+
+    const boundingBox = new THREE.Box3().setFromObject(window.scene);
+
+    if (boundingBox.isEmpty()) {
+        console.warn('Cannot fit camera to empty bounding box');
+        return;
+    }
+
+    const center = new THREE.Vector3();
+    boundingBox.getCenter(center);
+
+    const size = new THREE.Vector3();
+    boundingBox.getSize(size);
+
+    const radius = Math.max(size.x, size.y, size.z) * 0.7;
+
+    const direction = new THREE.Vector3(0.5, 0.5, 1).normalize();
+    const distance = radius / Math.sin(window.camera.fov * Math.PI / 360);
+    const cameraPosition = center.clone().add(direction.multiplyScalar(distance));
+
+    window.camera.position.copy(cameraPosition);
+    window.camera.lookAt(center);
+    window.controls.target.copy(center);
+
+    window.controls.update();
+
+    window.render();
+};
+
+window.scheduleProgressiveRendering = function() {
+    console.log("Progressive rendering scheduled");
+};
+
+window.cancelProgressiveRendering = function() {
+    console.log("Progressive rendering cancelled");
+};
+
+window.isUserInteracting = false;
+window.pendingUpdate = false;

@@ -1,0 +1,807 @@
+if (window.svgProcessingInitialized) {
+    // Script already initialized, functions should be available.
+    // console.log("svgProcessing.js already initialized.");
+} else {
+    window.svgProcessingInitialized = true;
+
+    let startTime; // Declare startTime
+
+    window.SVGProcessing = window.SVGProcessing || {};
+    window.SVGProcessing.Core = {};
+
+    function processPathsDirectlyAsync(options) {
+        setTimeout(() => processPathsDirectly(options), 0);
+    }
+    window.processPathsDirectlyAsync = processPathsDirectlyAsync;
+    window.SVGProcessing.Core.processPathsDirectlyAsync = processPathsDirectlyAsync;
+
+    function processPathsDirectly(options) {
+        startTime = performance.now();
+        
+        const { pathsToProcess, svgCenterX, svgCenterY, effectiveScale, lowQuality, isExport } = options;
+        const totalPaths = pathsToProcess.length;
+        
+        let stats = {
+            extrusionsMade: 0,
+            totalHoles: 0,
+            validatedHoles: 0,
+            shapesWithHoles: 0
+        };
+        
+        try {
+            console.log(`Processing SVG with ${totalPaths} paths at scale ${effectiveScale.toFixed(4)}`);
+            
+            // Initial pre-processing to identify potential holes
+            const allShapes = [];
+            const allPaths = [];
+            
+            // First pass - collect all shapes from all paths
+            for (let i = 0; i < totalPaths; i++) {
+                const path = pathsToProcess[i];
+                try {
+                    const shapes = path.toShapes(svgAssumeCCW);
+                    if (shapes.length > 0) {
+                        shapes.forEach((shape, shapeIndex) => {
+                            // Store information about each shape for later analysis
+                            allShapes.push({
+                                pathIndex: i,
+                                shapeIndex: shapeIndex,
+                                shape: shape,
+                                area: estimateShapeArea(shape)
+                            });
+                        });
+                        allPaths.push(path);
+                    } else {
+                        console.log(`Path[${i}] produced no shapes. Skipping.`);
+                    }
+                } catch (pathError) {
+                    console.error(`Error pre-processing path[${i}]:`, pathError);
+                }
+            }
+            
+            console.log(`Pre-processed ${allShapes.length} shapes from ${allPaths.length} paths`);
+            
+            // Sort shapes by area (largest first) to help with hole detection
+            allShapes.sort((a, b) => b.area - a.area);
+            
+            // Container for shapes we've processed
+            const processedShapeIndices = new Set();
+            
+            // Process shapes largest to smallest (helps with hole detection)
+            for (let i = 0; i < allShapes.length; i++) {
+                if (processedShapeIndices.has(i)) continue;
+                
+                const shapeInfo = allShapes[i];
+                const shape = shapeInfo.shape;
+                processedShapeIndices.add(i);
+                
+                // Get points and determine if this shape could be a hole in a larger shape
+                const pointsOuter = shape.getPoints(Math.round(24 * svgResolution));
+                const transformedOuterPoints = pointsOuter.map(p => new THREE.Vector2(
+                    (p.x - svgCenterX) * effectiveScale,
+                    (p.y - svgCenterY) * -effectiveScale
+                ));
+                
+                // Create the shape with the transformed points
+                const finalShape = new THREE.Shape(transformedOuterPoints);
+                finalShape.holes = [];
+                
+                // Look for potential holes in this shape (smaller shapes that are inside this one)
+                for (let j = 0; j < allShapes.length; j++) {
+                    if (processedShapeIndices.has(j) || i === j) continue;
+                    
+                    const potentialHole = allShapes[j];
+                    const holeShape = potentialHole.shape;
+                    
+                    // Check if this smaller shape might be a hole
+                    if (potentialHole.area < shapeInfo.area * 0.9) {
+                        // Try to validate it as a hole
+                        const holePath = validateHole(holeShape, finalShape, svgCenterX, svgCenterY, effectiveScale);
+                        if (holePath) {
+                            finalShape.holes.push(holePath);
+                            processedShapeIndices.add(j); // Mark hole as processed
+                            stats.validatedHoles++;
+                            console.log(`Added shape ${j} as hole in shape ${i}`);
+                        }
+                    }
+                }
+                
+                // Create the extruded shape only if it's not a hole in a larger shape
+                if (finalShape.holes.length > 0) {
+                    stats.shapesWithHoles++;
+                }
+                
+                const mesh = createExtrudedShape(finalShape, effectiveScale, lowQuality);
+                stats.extrusionsMade++;
+                
+                const shapeId = shapeColorCounter - 1;
+                
+                // Update shape info
+                const shapeInfo2 = window.shapeRenderInfo.find(info => info.id === shapeId);
+                if (shapeInfo2) {
+                    shapeInfo2.originalPath = {
+                        pathIndex: shapeInfo.pathIndex,
+                        shapeIndex: shapeInfo.shapeIndex,
+                        svgCenterX, svgCenterY, effectiveScale
+                    };
+                    shapeInfo2.useReversedWinding = false;
+                    shapeInfo2.operationType = 'extrude';
+                    
+                    if (finalShape.holes.length > 0) {
+                        shapeInfo2.hasHoles = true;
+                        shapeInfo2.holeCount = finalShape.holes.length;
+                    }
+                }
+            }
+            
+            console.log(`SVG processing stats: Created ${stats.extrusionsMade} extrusions, processed ${stats.totalHoles} potential holes, validated ${stats.validatedHoles} holes in ${stats.shapesWithHoles} shapes.`);
+            
+        } catch (error) {
+            console.error(`Unexpected error during processing:`, error);
+        }
+        
+        if (!isExport) {
+            if (document.getElementById('loading')) {
+                document.getElementById('loading').classList.add('hidden');
+            }
+            if (typeof populateShapeList === 'function') {
+                populateShapeList();
+            }
+        }
+    }
+    window.processPathsDirectly = processPathsDirectly;
+    window.SVGProcessing.Core.processPathsDirectly = processPathsDirectly;
+
+    function parseSVGForExtrusion(svgText, forImmediateUpdate = false, qualityFactor = 1.0, isExport = false) {
+        startTime = performance.now();
+        // console.log(`[parseSVGForExtrusion] Started at ${new Date().toISOString()}`);
+        
+        let lowQuality = forImmediateUpdate;
+
+        if (isExport) {
+            lowQuality = false;
+            qualityFactor = 1.0; 
+        }
+
+        if (autoSetYOffset && !isExport) {
+            const currentExtrusionHeight = (typeof extrusionHeight === 'number' && extrusionHeight > 0) ? extrusionHeight : 0;
+            extrusionPosition.y = currentExtrusionHeight / 2;
+            if (typeof updateExtrusionYUI === 'function') {
+                updateExtrusionYUI(extrusionPosition.y);
+            }
+            // console.log(`[parseSVGForExtrusion] Auto Y offset is ON. Set extrusionPosition.y to ${extrusionPosition.y.toFixed(2)} (based on extrusionHeight: ${currentExtrusionHeight.toFixed(2)}).`);
+        }
+
+        // console.log(`[parseSVGForExtrusion] Entered. lowQuality: ${lowQuality}, qualityFactor: ${qualityFactor}, isExporting: ${isExport}`);
+        // console.log(`[parseSVGForExtrusion] Current extrusionPosition: X=${extrusionPosition.x}, Y=${extrusionPosition.y}, Z=${extrusionPosition.z}`);
+        // console.log(`[parseSVGForExtrusion] Initial isHighQualityMode: ${isHighQualityMode}`);
+        // console.log(`[parseSVGForExtrusion] Initial brickDimensions: W=${brickDimensions.width}, H=${brickDimensions.height}, D=${brickDimensions.depth}`);
+        // console.log(`[parseSVGForExtrusion] Initial global svgScaleFactor: ${svgScaleFactor}`);
+        // console.log(`[parseSVGForExtrusion] SVG Data Length: ${svgText ? svgText.length : 'null or undefined'}`);
+
+        window.shapeRenderInfo = []; 
+        // console.log(`[DEBUG parseSVGForExtrusion] After RE-INITIALIZING, window.shapeRenderInfo length: ${window.shapeRenderInfo.length}, Content: ${JSON.stringify(window.shapeRenderInfo)}`);
+
+        if (typeof populateShapeList === 'function') {
+            populateShapeList();
+        }
+
+        if (isHighQualityMode && !isExport) {
+            console.log("[parseSVGForExtrusion] Exiting: In high quality mode but not exporting.");
+            return;
+        }
+        
+        if (isExport) {
+            qualityFactor = 1.0;
+        }
+        
+        if (!extrudedGroup) {
+            console.warn("extrudedGroup not initialized, creating it now");
+            extrudedGroup = new THREE.Group();
+            extrudedGroup.position.set(0, 0, 0);
+            extrudedGroup.rotation.set(0, 0, 0);
+            extrudedGroup.scale.set(1, 1, 1);
+            scene.add(extrudedGroup);
+        }
+        
+        // console.log("[parseSVGForExtrusion] Proceeding with full SVG processing (clearing and regenerating extrusions).");
+        while(extrudedGroup.children.length > 0) {
+            const child = extrudedGroup.children[0];
+            extrudedGroup.remove(child);
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) {
+                if (Array.isArray(child.material)) {
+                    child.material.forEach(m => m.dispose());
+                } else {
+                    child.material.dispose();
+                }
+            }
+        }
+        
+        extrudedGroup.userData.lastHeight = extrusionHeight;
+        
+        if (!isExport) {
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('loading').textContent = 'Processing SVG...';
+        }
+
+        try {
+            // console.log(`[parseSVGForExtrusion] SVG text length: ${svgText?.length || 0} bytes`);
+            if (!svgText) {
+                throw new Error("SVG text is empty or undefined");
+            }
+            
+            // console.log(`[parseSVGForExtrusion] SVG text preview: ${svgText.substring(0, 100)}${svgText.length > 100 ? '...' : ''}`);
+            
+            if (window.SVGOptimizer && typeof window.SVGOptimizer.optimizeSVG === 'function') {
+                try {
+                    // console.log("[parseSVGForExtrusion] Optimizing SVG with SVGO...");
+                    window.SVGOptimizer.optimizeSVG(svgText)
+                        .then(optimizedSvg => {
+                            processSVGWithLoader(optimizedSvg);
+                        })
+                        .catch(optimizeError => {
+                            console.error("[parseSVGForExtrusion] SVG optimization failed:", optimizeError);
+                            processSVGWithLoader(svgText);
+                        });
+                    return;
+                } catch (optimizerError) {
+                    console.warn("[parseSVGForExtrusion] SVG Optimizer failed, falling back to direct processing:", optimizerError);
+                    processSVGWithLoader(svgText);
+                }
+            } else {
+                // console.log("[parseSVGForExtrusion] SVG Optimizer not available, using basic normalization");
+                const normalizedSvg = normalizeSVG(svgText);
+                processSVGWithLoader(normalizedSvg);
+            }
+            
+            function processSVGWithLoader(processedSvgText) {
+                // Attempt to split complex paths into simpler ones
+                if (window.SVGProcessing && window.SVGProcessing.Utils && typeof window.SVGProcessing.Utils.splitDisjointSubpathsInSVG === 'function') {
+                    // console.log("[parseSVGForExtrusion] Attempting to split disjoint subpaths before loading.");
+                    processedSvgText = window.SVGProcessing.Utils.splitDisjointSubpathsInSVG(processedSvgText);
+                } else {
+                    // console.log("[parseSVGForExtrusion] splitDisjointSubpathsInSVG function not available.");
+                }
+
+                const loader = new THREE.SVGLoader();
+                
+                // console.log("[parseSVGForExtrusion] Parsing SVG data with SVGLoader...");
+                
+                let svgParsedData;
+                try {
+                    svgParsedData = loader.parse(processedSvgText);
+                } catch (parseError) {
+                    console.error("[parseSVGForExtrusion] SVG parsing error:", parseError);
+                    
+                    const recoveredSvg = attemptSVGRecovery(processedSvgText, parseError);
+                    if (recoveredSvg && recoveredSvg !== processedSvgText) {
+                        console.log("[parseSVGForExtrusion] Attempting to parse recovered SVG");
+                        try {
+                            svgParsedData = loader.parse(recoveredSvg);
+                            console.log("[parseSVGForExtrusion] Recovery successful!");
+                        } catch (secondError) {
+                            console.error("[parseSVGForExtrusion] Recovery failed:", secondError);
+                        }
+                    }
+                    
+                    if (!svgParsedData) {
+                        if (parseError.message && parseError.message.includes("getElementById")) {
+                            throw new Error("SVG parsing failed: SVG contains unresolved references (ids). Please simplify the SVG.");
+                        } else if (processedSvgText.includes("xlink:href")) {
+                            throw new Error("SVG parsing failed: SVG contains linked elements which may not be supported. Please embed all elements.");
+                        } else {
+                            throw new Error(`SVG parsing failed: ${parseError.message}`);
+                        }
+                    }
+                }
+                
+                const paths = svgParsedData.paths;
+                
+                // console.log(`[parseSVGForExtrusion] SVGLoader found ${paths.length} paths in the SVG`);
+                
+                if (paths.length > 0) {
+                    // console.log("[parseSVGForExtrusion] Path details:");
+                    paths.forEach((path, index) => {
+                        const subPathCount = path.subPaths?.length || 0;
+                        const totalCurves = path.subPaths?.reduce((sum, subPath) => sum + (subPath.curves?.length || 0), 0) || 0;
+                        
+                        // console.log(`  Path[${index}]: ${subPathCount} subpaths, ${totalCurves} total curves, color: ${path.color ? '#' + path.color.getHexString() : 'none'}`);
+                        
+                        if (path.subPaths && path.subPaths.length > 0 && path.subPaths[0].curves) {
+                            const firstSubPath = path.subPaths[0];
+                            const curveTypes = {};
+                            
+                            firstSubPath.curves.forEach(curve => {
+                                const type = curve.type || curve.constructor.name;
+                                curveTypes[type] = (curveTypes[type] || 0) + 1;
+                            });
+                            
+                            // console.log(`    First subpath: ${firstSubPath.curves.length} curves, types: ${JSON.stringify(curveTypes)}`);
+                        }
+                    });
+                }
+                
+                if (paths.length === 0) {
+                    console.warn("[parseSVGForExtrusion] No paths found in SVG by SVGLoader.");
+                    console.log("[parseSVGForExtrusion] SVG DOM structure analysis:");
+                    try {
+                        const parser = new DOMParser();
+                        const svgDoc = parser.parseFromString(svgText, "image/svg+xml");
+                        const errorNode = svgDoc.querySelector("parsererror");
+                        
+                        if (errorNode) {
+                            console.error("[parseSVGForExtrusion] XML parse error:", errorNode.textContent);
+                            throw new Error("SVG contains XML parsing errors");
+                        }
+                        
+                        const svgElement = svgDoc.querySelector("svg");
+                        if (!svgElement) {
+                            console.error("[parseSVGForExtrusion] No SVG element found in document");
+                            throw new Error("No SVG element found in document");
+                        }
+                        
+                        const elements = {
+                            paths: svgDoc.querySelectorAll("path").length,
+                            circles: svgDoc.querySelectorAll("circle").length,
+                            rects: svgDoc.querySelectorAll("rect").length,
+                            lines: svgDoc.querySelectorAll("line").length,
+                            polys: svgDoc.querySelectorAll("polygon, polyline").length,
+                            groups: svgDoc.querySelectorAll("g").length
+                        };
+                        
+                        console.log("[parseSVGForExtrusion] SVG elements count:", elements);
+                        
+                        if (elements.paths === 0 && 
+                            (elements.circles > 0 || elements.rects > 0 || elements.lines > 0 || elements.polys > 0)) {
+                            throw new Error("SVG contains elements but no paths. SVGLoader only supports path elements directly. Try converting to paths.");
+                        }
+                    } catch (domError) {
+                        console.error("[parseSVGForExtrusion] Error analyzing SVG DOM:", domError);
+                        throw new Error(`No paths found in SVG. Error: ${domError.message}`);
+                    }
+                    
+                    showMessage("No paths found in SVG. The file may be empty or use unsupported elements.");
+                    document.getElementById('loading').classList.add('hidden');
+                    return;
+                }
+                
+                let svgMinX = Infinity, svgMinY = Infinity, svgMaxX = -Infinity, svgMaxY = -Infinity;
+
+                paths.forEach(path => {
+                    path.subPaths.forEach(subPath => {
+                        const points = samplePointsFromSubPath(subPath); 
+                        
+                        points.forEach(point => {
+                            if (!point) return;
+                            svgMinX = Math.min(svgMinX, point.x);
+                            svgMinY = Math.min(svgMinY, point.y);
+                            svgMaxX = Math.max(svgMaxX, point.x);
+                            svgMaxY = Math.max(svgMaxY, point.y);
+                        });
+                    });
+                });
+                
+                // console.log(`Original SVG Bounds: (${svgMinX.toFixed(2)}, ${svgMinY.toFixed(2)}) to (${svgMaxX.toFixed(2)}, ${svgMaxY.toFixed(2)})`);
+                
+                const svgWidth = svgMaxX - svgMinX;
+                const svgHeight = svgMaxY - svgMinY;
+
+                if (svgWidth === 0 || svgHeight === 0 || !isFinite(svgWidth) || !isFinite(svgHeight)) {
+                    console.warn("[parseSVGForExtrusion] SVG has zero or invalid width/height. Cannot scale.", {svgWidth, svgHeight});
+                    showMessage("SVG has zero or invalid dimensions.");
+                    if (!isExport) document.getElementById('loading').classList.add('hidden');
+                    return;
+                }
+
+                const svgCenterX = (svgMinX + svgMaxX) / 2;
+                const svgCenterY = (svgMinY + svgMaxY) / 2;
+                
+                const userScaleFactor = (typeof svgScaleFactor === 'number' && !isNaN(svgScaleFactor) && svgScaleFactor > 0)
+                    ? svgScaleFactor
+                    : 1;
+                
+                if (isNaN(brickDimensions.width) || isNaN(brickDimensions.depth) || brickDimensions.width <= 0 || brickDimensions.depth <= 0) {
+                    console.error("[parseSVGForExtrusion] Invalid brickDimensions for scaling:", brickDimensions);
+                    showMessage("Error: Invalid base dimensions for scaling SVG.");
+                    if (!isExport) document.getElementById('loading').classList.add('hidden');
+                    return;
+                }
+                if (svgWidth <= 0 || svgHeight <= 0) {
+                     console.error("[parseSVGForExtrusion] Invalid svgWidth or svgHeight for scaling:", {svgWidth, svgHeight});
+                     showMessage("Error: Invalid SVG dimensions for scaling.");
+                     if (!isExport) document.getElementById('loading').classList.add('hidden');
+                     return;
+                }
+
+                const baseFitScale = Math.min(brickDimensions.width / svgWidth, brickDimensions.depth / svgHeight);
+                
+                const effectiveScale = baseFitScale * userScaleFactor;
+
+                if (isNaN(effectiveScale) || !isFinite(effectiveScale) || effectiveScale <= 0) {
+                    console.error(`[parseSVGForExtrusion] Calculated effectiveScale is invalid: ${effectiveScale}. BaseFitScale: ${baseFitScale}, UserScaleFactor: ${userScaleFactor}`);
+                    showMessage("Error: Could not calculate a valid scale for the SVG.");
+                    if (!isExport) document.getElementById('loading').classList.add('hidden');
+                    return;
+                }
+                
+                let pathsToProcess = paths;
+                
+                if (!isExport && lowQuality && paths.length > 20) {
+                    const limit = Math.max(5, Math.floor(paths.length * qualityFactor));
+                    pathsToProcess = paths.slice(0, limit);
+                    console.log(`Low quality mode: Processing ${limit} of ${paths.length} paths`);
+                }
+                
+                const processingOptions = { 
+                    pathsToProcess,
+                    svgCenterX, 
+                    svgCenterY, 
+                    effectiveScale,
+                    lowQuality, 
+                    isExport
+                };
+
+                try {
+                    if (!window.processPathsDirectlyAsync) {
+                        console.error("[parseSVGForExtrusion] processPathsDirectlyAsync is not defined. Using synchronous version instead.");
+                        processPathsDirectly(processingOptions);
+                    } else {
+                        processPathsDirectlyAsync(processingOptions);
+                    }
+                } catch (asyncError) {
+                    console.error("[parseSVGForExtrusion] Error calling processPathsDirectlyAsync:", asyncError);
+                    processPathsDirectly(processingOptions);
+                }
+            }
+            
+        } catch (error) {
+            console.error("[parseSVGForExtrusion] Error processing SVG:", error);
+            let userErrorMessage = "Error processing SVG. Check console for details.";
+            
+            if (error.message.includes("text is empty")) {
+                userErrorMessage = "SVG file is empty or corrupt.";
+            } else if (error.message.includes("unresolved references")) {
+                userErrorMessage = "SVG contains unresolved internal references. Try simplifying the SVG.";
+            } else if (error.message.includes("xlink:href")) {
+                userErrorMessage = "SVG contains linked elements which may not be supported. Try embedding all elements.";
+            } else if (error.message.includes("converting to paths")) {
+                userErrorMessage = "SVG contains elements that need to be converted to paths. Use a vector editor to convert all elements to paths.";
+            }
+            
+            if (!isExport) {
+                showMessage(userErrorMessage);
+                document.getElementById('loading').classList.add('hidden');
+            }
+            
+            const endTime = performance.now();
+            // console.log(`[parseSVGForExtrusion] Failed after ${(endTime - startTime).toFixed(2)}ms.`);
+        }
+        
+        const endTime = performance.now();
+        // console.log(`[parseSVGForExtrusion] Completed in ${(endTime - startTime).toFixed(2)}ms.`);
+    } 
+
+    function processHolesAsShapes(pathIndex, holeShapes, svgCenterX, svgCenterY, effectiveScale, lowQuality, isExport, stats) {
+        holeShapes.forEach((holeShape, shapeIndex) => {
+            try {
+                const pointsForOuter = Math.round((isExport ? 36 : (lowQuality ? 12 : 24)) * svgResolution);
+                
+                const originalOuterPoints = holeShape.getPoints(pointsForOuter);
+                if (originalOuterPoints.length < 3) {
+                    console.warn(`Path ${pathIndex}, Hole Shape ${shapeIndex}: Not enough points (${originalOuterPoints.length}). Skipping.`);
+                    return;
+                }
+                
+                const filteredOuterPoints = [];
+                let lastX = null, lastY = null;
+                
+                for (const p of originalOuterPoints) {
+                    if (lastX === null || lastY === null || 
+                        (Math.abs(p.x - lastX) > 0.0001 || Math.abs(p.y - lastY) > 0.0001)) {
+                        filteredOuterPoints.push(p);
+                        lastX = p.x;
+                        lastY = p.y;
+                    }
+                }
+                
+                if (filteredOuterPoints.length < 3) {
+                    console.warn(`Path ${pathIndex}, Hole Shape ${shapeIndex}: Too few points after filtering duplicates (${filteredOuterPoints.length}). Skipping.`);
+                    return;
+                }
+                
+                const transformedOuterPoints = filteredOuterPoints.map(p => {
+                    return new THREE.Vector2(
+                        (p.x - svgCenterX) * effectiveScale,
+                        (p.y - svgCenterY) * -effectiveScale
+                    );
+                });
+
+                const finalShape = new THREE.Shape(transformedOuterPoints);
+                finalShape.holes = [];
+                
+                const shapeArea = Math.abs(calculateShapeArea(finalShape));
+                finalShape.area = shapeArea;
+
+                if (shapeArea < 0.0001) {
+                    console.warn(`Path ${pathIndex}, Hole Shape ${shapeIndex}: Shape has effectively zero area (${shapeArea.toFixed(6)}). Skipping.`);
+                    return;
+                }
+                
+                createExtrudedShape(finalShape, effectiveScale, lowQuality);
+                stats.extrusionsMade++;
+
+                const shapeId = shapeColorCounter - 1;
+                
+                const shapeInfoIndex = window.shapeRenderInfo.findIndex(info => info.id === shapeId);
+                if (shapeInfoIndex >= 0) {
+                    window.shapeRenderInfo[shapeInfoIndex].originalPath = {
+                        pathIndex: pathIndex,
+                        shapeIndex: shapeIndex,
+                        svgCenterX: svgCenterX,
+                        svgCenterY: svgCenterY,
+                        effectiveScale: effectiveScale
+                    };
+                    window.shapeRenderInfo[shapeInfoIndex].useReversedWinding = false;
+                    
+                    window.shapeRenderInfo[shapeInfoIndex].operationType = 'remove';
+                    console.log(`Path ${pathIndex}, Hole Shape ${shapeIndex}: (ID: ${shapeId}) operationType set to 'remove'. Shape will be hidden. True subtraction requires CSG.`);
+                    
+                    if (window.shapeRenderInfo[shapeInfoIndex].mesh) {
+                        if (typeof updateMeshAppearanceForOperation === 'function') {
+                            updateMeshAppearanceForOperation(window.shapeRenderInfo[shapeInfoIndex].mesh, 'remove');
+                        } else {
+                            const material = window.shapeRenderInfo[shapeInfoIndex].mesh.material;
+                            if (!material.userData) material.userData = {};
+                            material.userData.originalColor = material.color.clone();
+                            
+                            material.color.set(0xff0000);
+                            material.wireframe = true;
+                            material.transparent = true;
+                            material.opacity = 0.7;
+                        }
+                    }
+                }
+            } catch (shapeError) {
+                console.error(`[processHolesAsShapes] Error processing hole shape [${pathIndex}/${shapeIndex}]:`, shapeError);
+            }
+        });
+    }
+
+    function processShapesWithHoles(pathIndex, shapesFromPath, svgCenterX, svgCenterY, effectiveScale, lowQuality, isExport, stats) {
+        shapesFromPath.forEach((originalShape, shapeIndex) => {
+            try {
+                const potentialHoleCount = originalShape.holes?.length || 0;
+                
+                const pointsForOuter = Math.round((isExport ? 36 : (lowQuality ? 12 : 24)) * svgResolution);
+                const pointsForHoles = Math.round((isExport ? 36 : (lowQuality ? 12 : 24)) * svgResolution);
+
+                const originalOuterPoints = originalShape.getPoints(pointsForOuter);
+                if (originalOuterPoints.length < 3) {
+                    console.warn(`Path ${pathIndex}, Shape ${shapeIndex}: Not enough points for outer contour (${originalOuterPoints.length}). Skipping.`);
+                    return;
+                }
+                
+                const filteredOuterPoints = [];
+                let lastX = null, lastY = null;
+                
+                for (const p of originalOuterPoints) {
+                    if (lastX === null || lastY === null || 
+                        (Math.abs(p.x - lastX) > 0.0001 || Math.abs(p.y - lastY) > 0.0001)) {
+                        filteredOuterPoints.push(p);
+                        lastX = p.x;
+                        lastY = p.y;
+                    }
+                }
+                
+                if (filteredOuterPoints.length < 3) {
+                    console.warn(`Path ${pathIndex}, Shape ${shapeIndex}: Too few points after filtering duplicates (${filteredOuterPoints.length}). Skipping.`);
+                    return;
+                }
+                
+                const transformedOuterPoints = filteredOuterPoints.map(p => {
+                    return new THREE.Vector2(
+                        (p.x - svgCenterX) * effectiveScale,
+                        (p.y - svgCenterY) * -effectiveScale
+                    );
+                });
+
+                const finalShape = new THREE.Shape(transformedOuterPoints);
+                finalShape.holes = [];
+                
+                const shapeArea = Math.abs(calculateShapeArea(finalShape));
+                finalShape.area = shapeArea;
+
+                // Get shape orientation for hole winding comparison
+                let shapeOrientation = 0;
+                if (typeof calculatePolygonOrientation === 'function') {
+                    shapeOrientation = calculatePolygonOrientation(transformedOuterPoints);
+                }
+
+                if (originalShape.holes && originalShape.holes.length > 0) {
+                    console.log(`Path ${pathIndex}, Shape ${shapeIndex}: Processing ${originalShape.holes.length} potential holes`);
+                    stats.totalHoles += originalShape.holes.length;
+                    
+                    const potentialHoles = originalShape.holes.map((holePath, holeIdx) => ({
+                        holePath,
+                        holeIdx,
+                        area: estimateHoleArea(holePath)
+                    }));
+                    
+                    // Process largest holes first to avoid nesting issues
+                    potentialHoles.sort((a, b) => b.area - a.area);
+                    
+                    for (const { holePath, holeIdx } of potentialHoles) {
+                        // Use improved validateHole function that checks orientation
+                        const finalHolePath = validateHole(holePath, finalShape, svgCenterX, svgCenterY, effectiveScale);
+                        
+                        if (finalHolePath) {
+                            // Ensure hole has correct winding direction for subtraction
+                            if (typeof calculatePolygonOrientation === 'function' && finalHolePath.getPoints) {
+                                const holePoints = finalHolePath.getPoints(24);
+                                const holeOrientation = calculatePolygonOrientation(holePoints);
+                                
+                                // Holes should have opposite orientation from the shape
+                                if (Math.sign(shapeOrientation) === Math.sign(holeOrientation) && holeOrientation !== 0) {
+                                    console.log(`Path ${pathIndex}, Shape ${shapeIndex}, Hole ${holeIdx}: Reversing hole winding for proper subtraction`);
+                                    
+                                    // Create a new path with reversed points to ensure proper hole subtraction
+                                    const correctedHolePath = new THREE.Path();
+                                    const reversedPoints = [...holePoints].reverse();
+                                    correctedHolePath.moveTo(reversedPoints[0].x, reversedPoints[0].y);
+                                    for (let i = 1; i < reversedPoints.length; i++) {
+                                        correctedHolePath.lineTo(reversedPoints[i].x, reversedPoints[i].y);
+                                    }
+                                    correctedHolePath.closePath();
+                                    finalShape.holes.push(correctedHolePath);
+                                } else {
+                                    finalShape.holes.push(finalHolePath);
+                                }
+                            } else {
+                                finalShape.holes.push(finalHolePath);
+                            }
+                            
+                            stats.validatedHoles++;
+                        }
+                    }
+                    
+                    if (finalShape.holes.length > 0) {
+                        stats.shapesWithHoles++;
+                        console.log(`Path ${pathIndex}, Shape ${shapeIndex}: ${finalShape.holes.length} of ${originalShape.holes.length} holes validated`);
+                    }
+                }
+                
+                if (shapeArea < 0.0001) {
+                    console.warn(`Path ${pathIndex}, Shape ${shapeIndex}: Shape has effectively zero area (${shapeArea.toFixed(6)}). Skipping.`);
+                    return;
+                }
+                
+                if (transformedOuterPoints.length > 500 && !isExport) {
+                    console.warn(`Path ${pathIndex}, Shape ${shapeIndex}: Shape has excessive points (${transformedOuterPoints.length}). Consider simplifying SVG.`);
+                    
+                    if (lowQuality) {
+                        console.log(`Path ${pathIndex}, Shape ${shapeIndex}: Skipping complex shape in low quality mode.`);
+                        return;
+                    }
+                }
+                
+                createExtrudedShape(finalShape, effectiveScale, lowQuality);
+                stats.extrusionsMade++;
+
+                const shapeId = shapeColorCounter - 1;
+                
+                const shapeInfoIndex = window.shapeRenderInfo.findIndex(info => info.id === shapeId);
+                if (shapeInfoIndex >= 0) {
+                    window.shapeRenderInfo[shapeInfoIndex].originalPath = {
+                        pathIndex: pathIndex,
+                        shapeIndex: shapeIndex,
+                        svgCenterX: svgCenterX,
+                        svgCenterY: svgCenterY,
+                        effectiveScale: effectiveScale
+                    };
+                    window.shapeRenderInfo[shapeInfoIndex].useReversedWinding = false;
+                    
+                    window.shapeRenderInfo[shapeInfoIndex].operationType = 'extrude';
+                    
+                    // Add information about holes
+                    if (finalShape.holes && finalShape.holes.length > 0) {
+                        window.shapeRenderInfo[shapeInfoIndex].hasHoles = true;
+                        window.shapeRenderInfo[shapeInfoIndex].holeCount = finalShape.holes.length;
+                    }
+                }
+            } catch (shapeError) {
+                console.error(`[processShapesWithHoles] Error processing path[${pathIndex}], shape[${shapeIndex}]:`, shapeError);
+            }
+        });
+    }
+
+    function validateHole(holePath, parentShape, svgCenterX, svgCenterY, effectiveScale) {
+        if (!holePath || !holePath.getPoints) {
+            return null;
+        }
+        
+        try {
+            const holePoints = holePath.getPoints(12);
+            if (holePoints.length < 3) {
+                return null; // Not enough points to form a polygon
+            }
+            
+            const transformedHolePoints = holePoints.map(p => {
+                return new THREE.Vector2(
+                    (p.x - svgCenterX) * effectiveScale,
+                    (p.y - svgCenterY) * -effectiveScale
+                );
+            });
+            
+            const outerPoints = parentShape.getPoints(12);
+            
+            // Calculate how many hole points are inside the parent shape
+            let pointsInside = 0;
+            for (const p of transformedHolePoints) {
+                if (isPointInPolygon(p, outerPoints)) {
+                    pointsInside++;
+                }
+            }
+            
+            const percentInside = pointsInside / transformedHolePoints.length;
+            
+            // Path for the validated hole
+            const holePath2D = new THREE.Path();
+            holePath2D.moveTo(transformedHolePoints[0].x, transformedHolePoints[0].y);
+            
+            for (let i = 1; i < transformedHolePoints.length; i++) {
+                holePath2D.lineTo(transformedHolePoints[i].x, transformedHolePoints[i].y);
+            }
+            
+            holePath2D.closePath();
+            
+            // Store the original points for later reference (used in orientation checking)
+            holePath2D.userData = {
+                originalHolePoints: transformedHolePoints
+            };
+            
+            if (percentInside >= 0.6) {
+                return holePath2D;
+            }
+            
+            return null;
+        } catch (error) {
+            console.error("Error validating hole:", error);
+            return null;
+        }
+    }
+    window.validateHole = validateHole;
+
+    // Add a helper function to estimate shape area for better hole detection
+    function estimateShapeArea(shape) {
+        try {
+            const points = shape.getPoints(24);
+            if (points.length < 3) return 0;
+            
+            let area = 0;
+            for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+                area += (points[j].x + points[i].x) * (points[j].y - points[i].y);
+            }
+            return Math.abs(area / 2);
+        } catch (e) {
+            console.error("Error calculating shape area:", e);
+            return 0;
+        }
+    }
+
+    // Add utility function for hole detection
+    function isPointInPolygon(point, polygon) {
+        let inside = false;
+        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+            const xi = polygon[i].x, yi = polygon[i].y;
+            const xj = polygon[j].x, yj = polygon[j].y;
+            
+            const intersect = ((yi > point.y) !== (yj > point.y))
+                && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+            if (intersect) inside = !inside;
+        }
+        return inside;
+    }
+
+    console.log("SVG Processing core initialized and ready.");
+}

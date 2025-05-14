@@ -1,19 +1,25 @@
 {
-  "name": "stampforge",
+  "name": "stamp-forge",
   "version": "1.0.0",
-  "description": "Tool for creating 3D models from SVG files for stamps",
+  "description": "A tool for creating 3D models from SVG files for 3D printing.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "scan": "node scan-gallery.js",
-    "dev": "nodemon server.js"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "scan": "node scripts/scan.js",
+    "optimize-svg": "node scripts/optimize-svg.js"
   },
+  "keywords": [
+    "3d-printing",
+    "svg",
+    "stamp",
+    "threejs"
+  ],
+  "author": "Petar Miletić",
+  "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.1"
-  },
-  "author": "",
-  "license": "MIT"
+    "express": "^4.17.1",
+    "svgo": "^3.0.2",
+    "three-csg-ts": "^3.1.10"
+  }
 }

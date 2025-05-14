@@ -85,9 +85,13 @@ Here are some great resources for finding SVG files to use with StampForge:
 
 StampForge includes a built-in SVG gallery. To use it:
 
-1. Add SVG files to the `/svgs` directory in the project root
-2. Refresh the gallery using the refresh button
-3. Click on any SVG thumbnail to load it into the editor
+1. Add SVG files to the `/svgs` directory in the project root.
+2. Run the gallery scanner script to update the gallery index:
+   ```
+   npm run scan
+   ```
+3. Refresh the StampForge application in your browser. The gallery should now show your added SVGs.
+4. Click on any SVG thumbnail to load it into the editor.
 
 ## Contact & Support
 
@@ -102,6 +106,7 @@ If you encounter any issues or have questions, please reach out through:
 
 - Three.js for 3D rendering
 - SVGLoader for SVG parsing and conversion
+- three-csg-ts for Constructive Solid Geometry (CSG) operations
 
 ## Contributing
 
