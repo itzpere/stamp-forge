@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2025-05-14T23:27:09.376Z",
+  "lastUpdated": "2025-05-14T23:33:15.170Z",
   "svgs": [
     {
       "name": "achievement-award-trophy-svgrepo-com.svg",
@@ -135,25 +135,11 @@
       "url": "svgs/bus-svgrepo-com.svg"
     },
     {
-      "name": "camera-photo-heart-svgrepo-com.svg",
-      "path": "svgs/camera-photo-heart-svgrepo-com.svg",
-      "size": 1696,
-      "modified": "2025-05-05T17:26:29.412Z",
-      "url": "svgs/camera-photo-heart-svgrepo-com.svg"
-    },
-    {
       "name": "cancer-svgrepo-com.svg",
       "path": "svgs/cancer-svgrepo-com.svg",
       "size": 1497,
       "modified": "2025-05-08T18:52:06.228Z",
       "url": "svgs/cancer-svgrepo-com.svg"
-    },
-    {
-      "name": "casino-gamble-gambling-svgrepo-com.svg",
-      "path": "svgs/casino-gamble-gambling-svgrepo-com.svg",
-      "size": 2149,
-      "modified": "2025-05-09T19:08:00.383Z",
-      "url": "svgs/casino-gamble-gambling-svgrepo-com.svg"
     },
     {
       "name": "castle-svgrepo-com.svg",
@@ -226,13 +212,6 @@
       "url": "svgs/coffee-cups-tea-svgrepo-com.svg"
     },
     {
-      "name": "deepseek_svg_20250513_861626.svg",
-      "path": "svgs/deepseek_svg_20250513_861626.svg",
-      "size": 477,
-      "modified": "2025-05-13T22:38:38.843Z",
-      "url": "svgs/deepseek_svg_20250513_861626.svg"
-    },
-    {
       "name": "dna-svgrepo-com.svg",
       "path": "svgs/dna-svgrepo-com.svg",
       "size": 1049,
@@ -259,55 +238,6 @@
       "size": 4793,
       "modified": "2025-05-05T17:26:28.973Z",
       "url": "svgs/earth-11-svgrepo-com.svg"
-    },
-    {
-      "name": "emo-devil-svgrepo-com.svg",
-      "path": "svgs/emo-devil-svgrepo-com.svg",
-      "size": 6424,
-      "modified": "2025-05-09T19:08:00.490Z",
-      "url": "svgs/emo-devil-svgrepo-com.svg"
-    },
-    {
-      "name": "emo-squint-svgrepo-com.svg",
-      "path": "svgs/emo-squint-svgrepo-com.svg",
-      "size": 1209,
-      "modified": "2025-05-09T19:08:01.011Z",
-      "url": "svgs/emo-squint-svgrepo-com.svg"
-    },
-    {
-      "name": "emo-sunglasses-svgrepo-com.svg",
-      "path": "svgs/emo-sunglasses-svgrepo-com.svg",
-      "size": 1458,
-      "modified": "2025-05-09T19:08:00.578Z",
-      "url": "svgs/emo-sunglasses-svgrepo-com.svg"
-    },
-    {
-      "name": "emo-thumbsup-svgrepo-com.svg",
-      "path": "svgs/emo-thumbsup-svgrepo-com.svg",
-      "size": 2709,
-      "modified": "2025-05-09T19:08:00.931Z",
-      "url": "svgs/emo-thumbsup-svgrepo-com.svg"
-    },
-    {
-      "name": "emo-tongue-svgrepo-com.svg",
-      "path": "svgs/emo-tongue-svgrepo-com.svg",
-      "size": 1167,
-      "modified": "2025-05-09T19:08:00.850Z",
-      "url": "svgs/emo-tongue-svgrepo-com.svg"
-    },
-    {
-      "name": "emo-wink-svgrepo-com.svg",
-      "path": "svgs/emo-wink-svgrepo-com.svg",
-      "size": 1196,
-      "modified": "2025-05-09T19:08:00.761Z",
-      "url": "svgs/emo-wink-svgrepo-com.svg"
-    },
-    {
-      "name": "emo-wink2-svgrepo-com.svg",
-      "path": "svgs/emo-wink2-svgrepo-com.svg",
-      "size": 1431,
-      "modified": "2025-05-09T19:08:00.677Z",
-      "url": "svgs/emo-wink2-svgrepo-com.svg"
     },
     {
       "name": "euro-svgrepo-com.svg",
@@ -350,13 +280,6 @@
       "size": 398,
       "modified": "2025-05-04T15:01:03.459Z",
       "url": "svgs/gem-svgrepo-com.svg"
-    },
-    {
-      "name": "halloween-bat-animal-svgrepo-com.svg",
-      "path": "svgs/halloween-bat-animal-svgrepo-com.svg",
-      "size": 3616,
-      "modified": "2025-05-09T19:08:00.151Z",
-      "url": "svgs/halloween-bat-animal-svgrepo-com.svg"
     },
     {
       "name": "love-gesture-hand-svgrepo-com.svg",
@@ -455,41 +378,6 @@
       "size": 3410,
       "modified": "2025-05-05T17:26:29.054Z",
       "url": "svgs/skeleton-16-svgrepo-com.svg"
-    },
-    {
-      "name": "skeleton-17-svgrepo-com.svg",
-      "path": "svgs/skeleton-17-svgrepo-com.svg",
-      "size": 8037,
-      "modified": "2025-05-05T17:26:29.006Z",
-      "url": "svgs/skeleton-17-svgrepo-com.svg"
-    },
-    {
-      "name": "smile-svgrepo-com(1).svg",
-      "path": "svgs/smile-svgrepo-com(1).svg",
-      "size": 1771,
-      "modified": "2025-05-08T18:50:13.240Z",
-      "url": "svgs/smile-svgrepo-com(1).svg"
-    },
-    {
-      "name": "smile-svgrepo-com(2).svg",
-      "path": "svgs/smile-svgrepo-com(2).svg",
-      "size": 1060,
-      "modified": "2025-05-08T18:50:13.079Z",
-      "url": "svgs/smile-svgrepo-com(2).svg"
-    },
-    {
-      "name": "smile-svgrepo-com.svg",
-      "path": "svgs/smile-svgrepo-com.svg",
-      "size": 772,
-      "modified": "2025-05-08T18:48:28.237Z",
-      "url": "svgs/smile-svgrepo-com.svg"
-    },
-    {
-      "name": "smile-wink-svgrepo-com.svg",
-      "path": "svgs/smile-wink-svgrepo-com.svg",
-      "size": 1042,
-      "modified": "2025-05-08T18:50:12.894Z",
-      "url": "svgs/smile-wink-svgrepo-com.svg"
     },
     {
       "name": "swan-love-heart-svgrepo-com.svg",
