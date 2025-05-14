@@ -343,6 +343,31 @@ function logSvgTagStructure(svgText) {
 window.logSvgTagStructure = logSvgTagStructure;
 window.SVGProcessing.Utils.logSvgTagStructure = logSvgTagStructure;
 
+// Consolidated calculateShapeArea function
+// Expects a shape-like object with a getPoints(divisions) method
+function calculateShapeArea(shape, divisions = 24) {
+    if (!shape || typeof shape.getPoints !== 'function') {
+        console.warn("[calculateShapeArea] Invalid shape object provided.");
+        return 0;
+    }
+    try {
+        const points = shape.getPoints(divisions);
+        if (points.length < 3) return 0;
+        
+        let area = 0;
+        for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+            area += (points[j].x + points[i].x) * (points[j].y - points[i].y);
+        }
+        return Math.abs(area / 2);
+    } catch (e) {
+        console.error("[calculateShapeArea] Error calculating shape area:", e);
+        return 0;
+    }
+}
+window.calculateShapeArea = calculateShapeArea;
+window.SVGProcessing.Utils.calculateShapeArea = calculateShapeArea;
+
+
 // Content from original svgPreprocessingUtils.js
 window.SVGPreprocessingUtils = {
     preprocessSVGText: function(svgText) {

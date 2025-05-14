@@ -9,6 +9,16 @@ if (window.svgProcessingInitialized) {
     window.SVGProcessing = window.SVGProcessing || {};
     window.SVGProcessing.Core = {};
 
+    // Add to global settings
+    window.svgGlobalSettings = window.svgGlobalSettings || {};
+    window.svgGlobalSettings.processing = window.svgGlobalSettings.processing || {
+        pointFilterThreshold: 0.0001,
+        lowQualityPathLimit: 20,
+        lowQualityPathMin: 5,
+        zeroAreaThreshold: 0.0001, // Same as holeValidation for consistency
+        holeAreaFactor: 0.9 // Factor to identify potential holes by area
+    };
+
     function processPathsDirectlyAsync(options) {
         setTimeout(() => processPathsDirectly(options), 0);
     }
@@ -17,6 +27,7 @@ if (window.svgProcessingInitialized) {
 
     function processPathsDirectly(options) {
         startTime = performance.now();
+        const settings = window.svgGlobalSettings;
         
         const { pathsToProcess, svgCenterX, svgCenterY, effectiveScale, lowQuality, isExport } = options;
         const totalPaths = pathsToProcess.length;
@@ -35,6 +46,9 @@ if (window.svgProcessingInitialized) {
             const allShapes = [];
             const allPaths = [];
             
+            const samplingKey = isExport ? 'detailed' : 'default';
+            const holeAreaFactor = settings.processing.holeAreaFactor || 0.9;
+
             // First pass - collect all shapes from all paths
             for (let i = 0; i < totalPaths; i++) {
                 const path = pathsToProcess[i];
@@ -42,12 +56,11 @@ if (window.svgProcessingInitialized) {
                     const shapes = path.toShapes(svgAssumeCCW);
                     if (shapes.length > 0) {
                         shapes.forEach((shape, shapeIndex) => {
-                            // Store information about each shape for later analysis
                             allShapes.push({
                                 pathIndex: i,
                                 shapeIndex: shapeIndex,
                                 shape: shape,
-                                area: estimateShapeArea(shape)
+                                area: window.SVGProcessing.Utils.calculateShapeArea(shape, settings.pointSampling.getPoints(samplingKey))
                             });
                         });
                         allPaths.push(path);
@@ -75,8 +88,7 @@ if (window.svgProcessingInitialized) {
                 const shape = shapeInfo.shape;
                 processedShapeIndices.add(i);
                 
-                // Get points and determine if this shape could be a hole in a larger shape
-                const pointsOuter = shape.getPoints(Math.round(24 * svgResolution));
+                const pointsOuter = shape.getPoints(settings.pointSampling.getPoints(samplingKey));
                 const transformedOuterPoints = pointsOuter.map(p => new THREE.Vector2(
                     (p.x - svgCenterX) * effectiveScale,
                     (p.y - svgCenterY) * -effectiveScale
@@ -94,11 +106,11 @@ if (window.svgProcessingInitialized) {
                     const holeShape = potentialHole.shape;
                     
                     // Check if this smaller shape might be a hole
-                    if (potentialHole.area < shapeInfo.area * 0.9) {
-                        // Try to validate it as a hole
-                        const holePath = validateHole(holeShape, finalShape, svgCenterX, svgCenterY, effectiveScale);
-                        if (holePath) {
-                            finalShape.holes.push(holePath);
+                    if (potentialHole.area < shapeInfo.area * holeAreaFactor) { // Use configurable factor
+                        // Try to validate it as a hole using the global validateHole
+                        const holeValidatedPath = window.SVGProcessing.Holes.validateHole(holeShape, finalShape, svgCenterX, svgCenterY, effectiveScale);
+                        if (holeValidatedPath) {
+                            finalShape.holes.push(holeValidatedPath);
                             processedShapeIndices.add(j); // Mark hole as processed
                             stats.validatedHoles++;
                             console.log(`Added shape ${j} as hole in shape ${i}`);
@@ -114,7 +126,7 @@ if (window.svgProcessingInitialized) {
                 const mesh = createExtrudedShape(finalShape, effectiveScale, lowQuality);
                 stats.extrusionsMade++;
                 
-                const shapeId = shapeColorCounter - 1;
+                const shapeId = window.shapeColorCounter - 1; // Access as global
                 
                 // Update shape info
                 const shapeInfo2 = window.shapeRenderInfo.find(info => info.id === shapeId);
@@ -154,7 +166,7 @@ if (window.svgProcessingInitialized) {
 
     function parseSVGForExtrusion(svgText, forImmediateUpdate = false, qualityFactor = 1.0, isExport = false) {
         startTime = performance.now();
-        // console.log(`[parseSVGForExtrusion] Started at ${new Date().toISOString()}`);
+        const settings = window.svgGlobalSettings;
         
         let lowQuality = forImmediateUpdate;
 
@@ -180,6 +192,7 @@ if (window.svgProcessingInitialized) {
         // console.log(`[parseSVGForExtrusion] SVG Data Length: ${svgText ? svgText.length : 'null or undefined'}`);
 
         window.shapeRenderInfo = []; 
+        window.shapeColorCounter = 0; // Initialize shapeColorCounter
         // console.log(`[DEBUG parseSVGForExtrusion] After RE-INITIALIZING, window.shapeRenderInfo length: ${window.shapeRenderInfo.length}, Content: ${JSON.stringify(window.shapeRenderInfo)}`);
 
         if (typeof populateShapeList === 'function') {
@@ -427,8 +440,8 @@ if (window.svgProcessingInitialized) {
                 
                 let pathsToProcess = paths;
                 
-                if (!isExport && lowQuality && paths.length > 20) {
-                    const limit = Math.max(5, Math.floor(paths.length * qualityFactor));
+                if (!isExport && lowQuality && paths.length > settings.processing.lowQualityPathLimit) {
+                    const limit = Math.max(settings.processing.lowQualityPathMin, Math.floor(paths.length * qualityFactor));
                     pathsToProcess = paths.slice(0, limit);
                     console.log(`Low quality mode: Processing ${limit} of ${paths.length} paths`);
                 }
@@ -483,9 +496,10 @@ if (window.svgProcessingInitialized) {
     } 
 
     function processHolesAsShapes(pathIndex, holeShapes, svgCenterX, svgCenterY, effectiveScale, lowQuality, isExport, stats) {
+        const settings = window.svgGlobalSettings;
         holeShapes.forEach((holeShape, shapeIndex) => {
             try {
-                const pointsForOuter = Math.round((isExport ? 36 : (lowQuality ? 12 : 24)) * svgResolution);
+                const pointsForOuter = settings.pointSampling.getPoints(isExport ? 'detailed' : (lowQuality ? 'default' : 'default')); // Or specific 'lowQualityDefault'
                 
                 const originalOuterPoints = holeShape.getPoints(pointsForOuter);
                 if (originalOuterPoints.length < 3) {
@@ -498,7 +512,7 @@ if (window.svgProcessingInitialized) {
                 
                 for (const p of originalOuterPoints) {
                     if (lastX === null || lastY === null || 
-                        (Math.abs(p.x - lastX) > 0.0001 || Math.abs(p.y - lastY) > 0.0001)) {
+                        (Math.abs(p.x - lastX) > settings.processing.pointFilterThreshold || Math.abs(p.y - lastY) > settings.processing.pointFilterThreshold)) {
                         filteredOuterPoints.push(p);
                         lastX = p.x;
                         lastY = p.y;
@@ -520,10 +534,10 @@ if (window.svgProcessingInitialized) {
                 const finalShape = new THREE.Shape(transformedOuterPoints);
                 finalShape.holes = [];
                 
-                const shapeArea = Math.abs(calculateShapeArea(finalShape));
+                const shapeArea = Math.abs(window.SVGProcessing.Utils.calculateShapeArea(finalShape, settings.pointSampling.getPoints('default')));
                 finalShape.area = shapeArea;
 
-                if (shapeArea < 0.0001) {
+                if (shapeArea < settings.processing.zeroAreaThreshold) {
                     console.warn(`Path ${pathIndex}, Hole Shape ${shapeIndex}: Shape has effectively zero area (${shapeArea.toFixed(6)}). Skipping.`);
                     return;
                 }
@@ -531,7 +545,7 @@ if (window.svgProcessingInitialized) {
                 createExtrudedShape(finalShape, effectiveScale, lowQuality);
                 stats.extrusionsMade++;
 
-                const shapeId = shapeColorCounter - 1;
+                const shapeId = window.shapeColorCounter - 1; // Access as global
                 
                 const shapeInfoIndex = window.shapeRenderInfo.findIndex(info => info.id === shapeId);
                 if (shapeInfoIndex >= 0) {
@@ -569,12 +583,13 @@ if (window.svgProcessingInitialized) {
     }
 
     function processShapesWithHoles(pathIndex, shapesFromPath, svgCenterX, svgCenterY, effectiveScale, lowQuality, isExport, stats) {
+        const settings = window.svgGlobalSettings;
         shapesFromPath.forEach((originalShape, shapeIndex) => {
             try {
                 const potentialHoleCount = originalShape.holes?.length || 0;
                 
-                const pointsForOuter = Math.round((isExport ? 36 : (lowQuality ? 12 : 24)) * svgResolution);
-                const pointsForHoles = Math.round((isExport ? 36 : (lowQuality ? 12 : 24)) * svgResolution);
+                const pointsForOuter = settings.pointSampling.getPoints(isExport ? 'detailed' : (lowQuality ? 'default' : 'default'));
+                // const pointsForHoles = settings.pointSampling.getPoints(isExport ? 'detailed' : (lowQuality ? 'default' : 'default')); // Used by validateHole
 
                 const originalOuterPoints = originalShape.getPoints(pointsForOuter);
                 if (originalOuterPoints.length < 3) {
@@ -587,7 +602,7 @@ if (window.svgProcessingInitialized) {
                 
                 for (const p of originalOuterPoints) {
                     if (lastX === null || lastY === null || 
-                        (Math.abs(p.x - lastX) > 0.0001 || Math.abs(p.y - lastY) > 0.0001)) {
+                        (Math.abs(p.x - lastX) > settings.processing.pointFilterThreshold || Math.abs(p.y - lastY) > settings.processing.pointFilterThreshold)) {
                         filteredOuterPoints.push(p);
                         lastX = p.x;
                         lastY = p.y;
@@ -609,7 +624,7 @@ if (window.svgProcessingInitialized) {
                 const finalShape = new THREE.Shape(transformedOuterPoints);
                 finalShape.holes = [];
                 
-                const shapeArea = Math.abs(calculateShapeArea(finalShape));
+                const shapeArea = Math.abs(window.SVGProcessing.Utils.calculateShapeArea(finalShape, settings.pointSampling.getPoints('default')));
                 finalShape.area = shapeArea;
 
                 // Get shape orientation for hole winding comparison
@@ -625,7 +640,7 @@ if (window.svgProcessingInitialized) {
                     const potentialHoles = originalShape.holes.map((holePath, holeIdx) => ({
                         holePath,
                         holeIdx,
-                        area: estimateHoleArea(holePath)
+                        area: window.SVGProcessing.Utils.calculateShapeArea(holePath, settings.pointSampling.getPoints('default')) // Assuming holePath is Shape-like
                     }));
                     
                     // Process largest holes first to avoid nesting issues
@@ -633,34 +648,11 @@ if (window.svgProcessingInitialized) {
                     
                     for (const { holePath, holeIdx } of potentialHoles) {
                         // Use improved validateHole function that checks orientation
-                        const finalHolePath = validateHole(holePath, finalShape, svgCenterX, svgCenterY, effectiveScale);
+                        const finalHoleValidatedPath = window.SVGProcessing.Holes.validateHole(holePath, finalShape, svgCenterX, svgCenterY, effectiveScale);
                         
-                        if (finalHolePath) {
-                            // Ensure hole has correct winding direction for subtraction
-                            if (typeof calculatePolygonOrientation === 'function' && finalHolePath.getPoints) {
-                                const holePoints = finalHolePath.getPoints(24);
-                                const holeOrientation = calculatePolygonOrientation(holePoints);
-                                
-                                // Holes should have opposite orientation from the shape
-                                if (Math.sign(shapeOrientation) === Math.sign(holeOrientation) && holeOrientation !== 0) {
-                                    console.log(`Path ${pathIndex}, Shape ${shapeIndex}, Hole ${holeIdx}: Reversing hole winding for proper subtraction`);
-                                    
-                                    // Create a new path with reversed points to ensure proper hole subtraction
-                                    const correctedHolePath = new THREE.Path();
-                                    const reversedPoints = [...holePoints].reverse();
-                                    correctedHolePath.moveTo(reversedPoints[0].x, reversedPoints[0].y);
-                                    for (let i = 1; i < reversedPoints.length; i++) {
-                                        correctedHolePath.lineTo(reversedPoints[i].x, reversedPoints[i].y);
-                                    }
-                                    correctedHolePath.closePath();
-                                    finalShape.holes.push(correctedHolePath);
-                                } else {
-                                    finalShape.holes.push(finalHolePath);
-                                }
-                            } else {
-                                finalShape.holes.push(finalHolePath);
-                            }
-                            
+                        if (finalHoleValidatedPath) {
+                            // The global validateHole already handles winding.
+                            finalShape.holes.push(finalHoleValidatedPath);
                             stats.validatedHoles++;
                         }
                     }
@@ -671,7 +663,7 @@ if (window.svgProcessingInitialized) {
                     }
                 }
                 
-                if (shapeArea < 0.0001) {
+                if (shapeArea < settings.processing.zeroAreaThreshold) {
                     console.warn(`Path ${pathIndex}, Shape ${shapeIndex}: Shape has effectively zero area (${shapeArea.toFixed(6)}). Skipping.`);
                     return;
                 }
@@ -688,7 +680,7 @@ if (window.svgProcessingInitialized) {
                 createExtrudedShape(finalShape, effectiveScale, lowQuality);
                 stats.extrusionsMade++;
 
-                const shapeId = shapeColorCounter - 1;
+                const shapeId = window.shapeColorCounter - 1; // Access as global
                 
                 const shapeInfoIndex = window.shapeRenderInfo.findIndex(info => info.id === shapeId);
                 if (shapeInfoIndex >= 0) {
@@ -715,93 +707,8 @@ if (window.svgProcessingInitialized) {
         });
     }
 
-    function validateHole(holePath, parentShape, svgCenterX, svgCenterY, effectiveScale) {
-        if (!holePath || !holePath.getPoints) {
-            return null;
-        }
-        
-        try {
-            const holePoints = holePath.getPoints(12);
-            if (holePoints.length < 3) {
-                return null; // Not enough points to form a polygon
-            }
-            
-            const transformedHolePoints = holePoints.map(p => {
-                return new THREE.Vector2(
-                    (p.x - svgCenterX) * effectiveScale,
-                    (p.y - svgCenterY) * -effectiveScale
-                );
-            });
-            
-            const outerPoints = parentShape.getPoints(12);
-            
-            // Calculate how many hole points are inside the parent shape
-            let pointsInside = 0;
-            for (const p of transformedHolePoints) {
-                if (isPointInPolygon(p, outerPoints)) {
-                    pointsInside++;
-                }
-            }
-            
-            const percentInside = pointsInside / transformedHolePoints.length;
-            
-            // Path for the validated hole
-            const holePath2D = new THREE.Path();
-            holePath2D.moveTo(transformedHolePoints[0].x, transformedHolePoints[0].y);
-            
-            for (let i = 1; i < transformedHolePoints.length; i++) {
-                holePath2D.lineTo(transformedHolePoints[i].x, transformedHolePoints[i].y);
-            }
-            
-            holePath2D.closePath();
-            
-            // Store the original points for later reference (used in orientation checking)
-            holePath2D.userData = {
-                originalHolePoints: transformedHolePoints
-            };
-            
-            if (percentInside >= 0.6) {
-                return holePath2D;
-            }
-            
-            return null;
-        } catch (error) {
-            console.error("Error validating hole:", error);
-            return null;
-        }
-    }
-    window.validateHole = validateHole;
-
-    // Add a helper function to estimate shape area for better hole detection
-    function estimateShapeArea(shape) {
-        try {
-            const points = shape.getPoints(24);
-            if (points.length < 3) return 0;
-            
-            let area = 0;
-            for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-                area += (points[j].x + points[i].x) * (points[j].y - points[i].y);
-            }
-            return Math.abs(area / 2);
-        } catch (e) {
-            console.error("Error calculating shape area:", e);
-            return 0;
-        }
-    }
-
-    // Add utility function for hole detection
-    function isPointInPolygon(point, polygon) {
-        let inside = false;
-        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-            const xi = polygon[i].x, yi = polygon[i].y;
-            const xj = polygon[j].x, yj = polygon[j].y;
-            
-            const intersect = ((yi > point.y) !== (yj > point.y))
-                && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
-            if (intersect) inside = !inside;
-        }
-        return inside;
-    }
+    // Remove local validateHole, estimateShapeArea, and isPointInPolygon functions
+    // window.validateHole = validateHole; // This was assigning the local one
 
     console.log("SVG Processing core initialized and ready.");
 }

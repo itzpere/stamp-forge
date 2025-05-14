@@ -1,19 +1,43 @@
 window.SVGProcessing = window.SVGProcessing || {};
 window.SVGProcessing.Shapes = {};
 
+// Add extrusion settings to global config
+window.svgGlobalSettings = window.svgGlobalSettings || {};
+window.svgGlobalSettings.shapeExtrusion = window.svgGlobalSettings.shapeExtrusion || {
+    bevelThickness: 0.05,
+    bevelSize: 0.02,
+    defaultCurveSegments: 12,
+    lowQualityCurveSegments: 8,
+    highQualityCurveSegments: 24,
+    disabledColor: 0x999999,
+    disabledOpacity: 0.3,
+    regenerateShapeMatchWeight: 1000
+};
+
+
 function createExtrudedShapeWithId(shape, effectiveScaleFromParser_unused, lowQuality, shapeId) {
+    const settings = window.svgGlobalSettings;
+    const extrudeConfig = settings.shapeExtrusion;
+
     const validHeight = Math.max(0.1, Number(extrusionHeight) || 1);
     const steps = isHighQualityMode ? 4 : (lowQuality ? 1 : 2);
     
+    let curveSegmentsValue = extrudeConfig.defaultCurveSegments;
+    if (isHighQualityMode) {
+        curveSegmentsValue = extrudeConfig.highQualityCurveSegments;
+    } else if (lowQuality) {
+        curveSegmentsValue = extrudeConfig.lowQualityCurveSegments;
+    }
+
     // Enhanced extrude settings for better hole handling
     const extrudeSettings = {
         steps: steps,
         depth: validHeight,
         bevelEnabled: !lowQuality && exportSettings.enableBevel,
-        bevelThickness: 0.05,
-        bevelSize: 0.02,
+        bevelThickness: extrudeConfig.bevelThickness,
+        bevelSize: extrudeConfig.bevelSize,
         bevelSegments: isHighQualityMode ? 3 : 1,
-        curveSegments: Math.round((isHighQualityMode ? 24 : (lowQuality ? 8 : 12)) * svgResolution)
+        curveSegments: Math.round(curveSegmentsValue * (typeof window.svgResolution === 'number' ? window.svgResolution : 1))
     };
     
     const existingShapeInfo = window.shapeRenderInfo.find(info => info.id === shapeId);
@@ -34,7 +58,7 @@ function createExtrudedShapeWithId(shape, effectiveScaleFromParser_unused, lowQu
             console.log(`Shape ID ${shapeId} is marked as a hole. Not extruding.`);
             return null;
         } else if (existingShapeInfo.operationType === 'disable') {
-            material.color.set(0x999999);
+            material.color.set(extrudeConfig.disabledColor);
         }
     } else {
         // New shape
@@ -73,7 +97,7 @@ function createExtrudedShapeWithId(shape, effectiveScaleFromParser_unused, lowQu
                 }
                 
                 // Debug information for better hole troubleshooting
-                console.log(`Hole ${i} points: ${hole.getPoints(12).length}, closed: ${hole.currentPoint && hole.getPoint(0) && hole.currentPoint.equals(hole.getPoint(0))}`);
+                console.log(`Hole ${i} points: ${hole.getPoints(settings.pointSampling.getPoints('default')).length}, closed: ${hole.currentPoint && hole.getPoint(0) && hole.currentPoint.equals(hole.getPoint(0))}`);
             }
         }
         
@@ -152,16 +176,7 @@ function generateDistinctColor(index) {
     return new THREE.Color(`hsl(${hue}, 70%, 50%)`);
 }
 
-function calculateShapeArea(shape) {
-    const points = shape.getPoints(24);
-    let area = 0;
-    
-    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-        area += (points[j].x + points[i].x) * (points[j].y - points[i].y);
-    }
-    
-    return area / 2;
-}
+// calculateShapeArea is removed from here, now in svgUtilities.js
 
 function getBoundingBox(points) {
     let minX = Infinity, minY = Infinity;
@@ -180,6 +195,8 @@ function getBoundingBox(points) {
 }
 
 function regenerateShapeWithWinding(shapeInfo) {
+    const settings = window.svgGlobalSettings;
+    const extrudeConfig = settings.shapeExtrusion;
     if (!shapeInfo || !shapeInfo.originalPath) {
         console.error("Cannot regenerate shape: missing original path information");
         return;
@@ -273,18 +290,18 @@ function regenerateShapeWithWinding(shapeInfo) {
 
     if (referenceShapesFromPath && referenceShapesFromPath.length > shapeInfo.originalPath.shapeIndex) {
         const referenceShapeGeometry = referenceShapesFromPath[shapeInfo.originalPath.shapeIndex];
-        const refPoints = referenceShapeGeometry.getPoints(24);
+        const refPoints = referenceShapeGeometry.getPoints(settings.pointSampling.getPoints('default'));
         const refBounds = getBoundingBox(refPoints); // Ensure getBoundingBox is available
-        const refArea = Math.abs(calculateShapeArea(referenceShapeGeometry)); // Ensure calculateShapeArea is available
+        const refArea = Math.abs(window.SVGProcessing.Utils.calculateShapeArea(referenceShapeGeometry, settings.pointSampling.getPoints('default'))); // Use global
         const refCenterX = (refBounds.minX + refBounds.maxX) / 2;
         const refCenterY = (refBounds.minY + refBounds.maxY) / 2;
 
         let bestMatchScore = Infinity;
 
         candidateShapes.forEach((candidateShape, index) => {
-            const candPoints = candidateShape.getPoints(24);
+            const candPoints = candidateShape.getPoints(settings.pointSampling.getPoints('default'));
             const candBounds = getBoundingBox(candPoints);
-            const candArea = Math.abs(calculateShapeArea(candidateShape));
+            const candArea = Math.abs(window.SVGProcessing.Utils.calculateShapeArea(candidateShape, settings.pointSampling.getPoints('default'))); // Use global
             const candCenterX = (candBounds.minX + candBounds.maxX) / 2;
             const candCenterY = (candBounds.minY + candBounds.maxY) / 2;
 
@@ -293,7 +310,7 @@ function regenerateShapeWithWinding(shapeInfo) {
             const maxArea = Math.max(refArea, candArea, 0.00001); // Avoid division by zero
             const areaRatioScore = areaDiff / maxArea; 
             
-            const score = distanceSquared * 1000 + areaRatioScore; 
+            const score = distanceSquared * extrudeConfig.regenerateShapeMatchWeight + areaRatioScore; 
 
             if (score < bestMatchScore) {
                 bestMatchScore = score;
@@ -318,9 +335,9 @@ function regenerateShapeWithWinding(shapeInfo) {
     
     const { svgCenterX, svgCenterY, effectiveScale } = shapeInfo.originalPath;
     
-    const lowQuality = false;
-    const pointsForOuter = Math.round(24 * svgResolution);
-    const pointsForHoles = Math.round(24 * svgResolution);
+    const lowQuality = false; // For regeneration, assume higher quality for points
+    const pointsForOuter = settings.pointSampling.getPoints('default');
+    // const pointsForHoles = settings.pointSampling.getPoints('default'); // Already available via validateHole
 
     const originalOuterPoints = originalShape.getPoints(pointsForOuter);
     if (originalOuterPoints.length < 2) { // Changed from originalOuterPoints.length < 3 to < 2 as THREE.Shape can be formed by 2 points (a line) but ExtrudeGeometry might still fail. Keeping it as < 2 for now.
@@ -343,33 +360,14 @@ function regenerateShapeWithWinding(shapeInfo) {
         let validHoles = 0;
         
         originalShape.holes.forEach((holePath, holeIndex) => {
-            // Ensure validateHole is available and correctly namespaced if necessary
-            const finalHolePath = window.validateHole ? window.validateHole(holePath, finalShape, svgCenterX, svgCenterY, effectiveScale) : validateHole(holePath, finalShape, svgCenterX, svgCenterY, effectiveScale);
+            const finalHolePath = window.SVGProcessing.Holes.validateHole(holePath, finalShape, svgCenterX, svgCenterY, effectiveScale);
             
             if (finalHolePath) {
                 // Check if this hole has the correct orientation for subtraction
-                if (finalHolePath.userData && finalHolePath.userData.originalHolePoints) {
-                    const shapeOrientation = calculatePolygonOrientation(transformedOuterPoints);
-                    const holeOrientation = calculatePolygonOrientation(finalHolePath.userData.originalHolePoints);
-                    
-                    // Holes should have opposite orientation from the shape for proper subtraction
-                    if (Math.sign(shapeOrientation) === Math.sign(holeOrientation)) {
-                        console.log(`Correcting hole ${holeIndex} orientation for proper subtraction`);
-                        // Create a new path with reversed points
-                        const correctedHolePath = new THREE.Path();
-                        const holePoints = finalHolePath.getPoints(24).reverse();
-                        correctedHolePath.moveTo(holePoints[0].x, holePoints[0].y);
-                        for (let i = 1; i < holePoints.length; i++) {
-                            correctedHolePath.lineTo(holePoints[i].x, holePoints[i].y);
-                        }
-                        correctedHolePath.closePath();
-                        finalShape.holes.push(correctedHolePath);
-                    } else {
-                        finalShape.holes.push(finalHolePath);
-                    }
-                } else {
-                    finalShape.holes.push(finalHolePath);
-                }
+                // The global validateHole already handles reversal if needed and stores it in userData.needsReversal
+                // The points in finalHolePath are already correctly ordered by validateHole.
+                // We just need to add it.
+                finalShape.holes.push(finalHolePath);
                 validHoles++;
             }
         });
@@ -388,6 +386,8 @@ function updateMeshAppearanceForOperation(mesh, operationType) {
         mesh.material.userData.originalColor = mesh.material.color.clone();
     }
     
+    const extrudeConfig = window.svgGlobalSettings.shapeExtrusion;
+
     switch (operationType) {
         case 'remove':
             // This shape is identified as a hole that should be subtracted.
@@ -408,10 +408,10 @@ function updateMeshAppearanceForOperation(mesh, operationType) {
             break;
             
         case 'disable':
-            mesh.material.color.set(0x999999);
+            mesh.material.color.set(extrudeConfig.disabledColor);
             mesh.material.wireframe = false;
             mesh.material.transparent = true;
-            mesh.material.opacity = 0.3; // Keep opacity for potential debugging if made visible
+            mesh.material.opacity = extrudeConfig.disabledOpacity; 
             mesh.material.depthWrite = true; 
             mesh.material.side = THREE.FrontSide;
             mesh.visible = false; // Explicitly hide disabled shapes
@@ -447,9 +447,6 @@ window.SVGProcessing.Shapes.createExtrudedShape = createExtrudedShape;
 
 window.generateDistinctColor = generateDistinctColor;
 window.SVGProcessing.Shapes.generateDistinctColor = generateDistinctColor;
-
-window.calculateShapeArea = calculateShapeArea;
-window.SVGProcessing.Shapes.calculateShapeArea = calculateShapeArea;
 
 window.getBoundingBox = getBoundingBox;
 window.SVGProcessing.Shapes.getBoundingBox = getBoundingBox;

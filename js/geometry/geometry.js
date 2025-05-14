@@ -1,14 +1,13 @@
-let stampBase = null;
 let defaultBaseLoaded = false;
 
 function createBrick() {
     clearExistingObjects();
     
-    extrudedGroup = new THREE.Group();
-    scene.add(extrudedGroup);
+    window.extrudedGroup = new THREE.Group(); // Ensure it's assigned to window
+    scene.add(window.extrudedGroup);
     
-    if (stampBase) {
-        scene.add(stampBase);
+    if (window.stampBase) { // Use window.stampBase
+        scene.add(window.stampBase);
         console.log("Using custom STL stamp base");
     } else {
         loadDefaultStampBase();
@@ -28,7 +27,9 @@ function clearExistingObjects() {
     objectsToRemove.forEach(item => {
         if (typeof item.global !== 'undefined' && item.global) {
             scene.remove(item.global);
-            window[item.obj] = null;
+            if (window[item.obj] === item.global) { // Ensure we only nullify if it's the exact same object
+                 window[item.obj] = null;
+            }
         }
     });
 }
@@ -51,7 +52,7 @@ function loadDefaultStampBase() {
                 side: THREE.DoubleSide
             });
             
-            stampBase = new THREE.Mesh(geometry, material);
+            window.stampBase = new THREE.Mesh(geometry, material); // Assign to window.stampBase
             
             geometry.computeBoundingBox();
             const boundingBox = geometry.boundingBox;
@@ -59,9 +60,10 @@ function loadDefaultStampBase() {
             boundingBox.getCenter(center);
             geometry.translate(-center.x, -boundingBox.min.y, -center.z);
 
+            // Recompute bounding box AFTER translation for accurate size
             geometry.computeBoundingBox();
             const size = new THREE.Vector3();
-            boundingBox.getSize(size);
+            geometry.boundingBox.getSize(size); // Use updated boundingBox
             
             brickDimensions.height = size.y > 0 ? size.y : 3;
             brickDimensions.width = size.x > 0 ? size.x : 20;
@@ -71,7 +73,7 @@ function loadDefaultStampBase() {
                 applyAutoYOffsetBehavior();
             }
             
-            scene.add(stampBase);
+            scene.add(window.stampBase); // Use window.stampBase
             defaultBaseLoaded = true;
             
             updateAndApplyBaseTopSurface();
@@ -97,14 +99,14 @@ function loadDefaultStampBase() {
 }
 
 function updateAndApplyBaseTopSurface() {
-    if (!stampBase) {
+    if (!window.stampBase) { // Use window.stampBase
         console.warn("updateAndApplyBaseTopSurface: stampBase is null");
         currentBaseTopSurfaceY = brickDimensions.height || 3.0;
         return;
     }
 
-    stampBase.updateMatrixWorld(true);
-    const worldBox = new THREE.Box3().setFromObject(stampBase);
+    window.stampBase.updateMatrixWorld(true); // Use window.stampBase
+    const worldBox = new THREE.Box3().setFromObject(window.stampBase); // Use window.stampBase
     
     if (worldBox.isEmpty()) {
         console.warn("Stamp base bounding box is empty. Using height from dimensions.");
@@ -117,9 +119,9 @@ function updateAndApplyBaseTopSurface() {
 
     if (autoSetYOffset === true) {
         // Add check for face components before repositioning any objects
-        if (extrudedGroup) {
+        if (window.extrudedGroup) { // Use window.extrudedGroup
             // Lock face component positions to prevent overriding during updates
-            extrudedGroup.traverse(child => {
+            window.extrudedGroup.traverse(child => { // Use window.extrudedGroup
                 if (child.isMesh && child.userData && child.userData.isFaceComponent) {
                     // Store current position in userData for reference
                     if (!child.userData.lockedPosition) {

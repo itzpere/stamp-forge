@@ -1,6 +1,57 @@
 window.SVGProcessing = window.SVGProcessing || {};
 window.SVGProcessing.Holes = {};
 
+// Centralized configuration
+window.svgGlobalSettings = window.svgGlobalSettings || {};
+
+window.svgGlobalSettings.pointSampling = window.svgGlobalSettings.pointSampling || {
+    default: 24,
+    detailed: 48,
+    faceComponent: 24,
+    // Helper function to get sampling points, assuming window.svgResolution is globally available
+    getPoints: function(type = 'default') {
+        const basePointsKey = type; // e.g., 'default', 'detailed', 'faceComponent'
+        const basePoints = this[basePointsKey] || this.default;
+        // Ensure svgResolution is a number, default to 1 if not available or not a number
+        const resFactor = (typeof window.svgResolution === 'number' && !isNaN(window.svgResolution)) ? window.svgResolution : 1;
+        return Math.round(basePoints * resFactor);
+    }
+};
+
+window.svgGlobalSettings.geometry = window.svgGlobalSettings.geometry || {
+    pointInPolygonEpsilon: 0.00001
+};
+
+window.svgGlobalSettings.holeValidation = window.svgGlobalSettings.holeValidation || {
+    areaRatioThreshold: 0.5,      // Max hole area relative to outer shape
+    pointsInsideThreshold: 0.6,   // Min percentage of hole test points inside outer shape
+    zeroAreaThreshold: 0.0001,    // Min area for a hole to be considered valid
+    duplicatePointThreshold: 0.0001, // Threshold for filtering duplicate points
+    maxPointsToTestInside: 4      // Max additional points (besides center) to test for hole containment
+};
+
+window.svgGlobalSettings.holeDetection = window.svgGlobalSettings.holeDetection || {
+    areaRatioThreshold: 0.5,      // Max area for a path to be a potential hole (relative to outer)
+    aggressiveness: 0.7,          // Controls leniency in point containment and area checks
+    zeroAreaThreshold: 0.0001,    // Min area for a path to be considered
+    pointsToCheck: 5,             // Number of points on a path to check for containment (includes center)
+    simpleShapeMaxPoints: 8,      // Max points for a shape to be considered "simple"
+    simpleShapeAreaRatioThreshold: 0.1 // Area ratio for simple shapes to be discarded as holes
+};
+
+window.svgGlobalSettings.faceDetection = window.svgGlobalSettings.faceDetection || {
+    minComponents: 2,
+    maxComponents: 8,
+    componentMinArea: 0.0001,
+    threeComponent: {
+        maxEyesYDiffToXDiffRatio: 1.0, // Max ratio of vertical eye diff to horizontal eye diff
+        // For mouthIsCentered, we can add a tolerance if needed, e.g., relative to eye spacing.
+        // For now, the existing logic is kept but uses this config structure.
+    },
+    filenameKeywords: /face|smile|emoji|emo|emote|emotion|grin|laugh|eye|mouth/i
+};
+
+
 function getShapeCenter(points) {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     
@@ -20,9 +71,10 @@ window.getShapeCenter = getShapeCenter;
 window.SVGProcessing.Holes.getShapeCenter = getShapeCenter;
 
 function isPointInPolygon(point, polygonVertices) {
+    const settings = window.svgGlobalSettings;
     let inside = false;
     const x = point.x, y = point.y;
-    const epsilon = 0.00001; 
+    const epsilon = settings.geometry.pointInPolygonEpsilon; 
     
     for (const vertex of polygonVertices) {
         if (Math.abs(vertex.x - x) < epsilon && Math.abs(vertex.y - y) < epsilon) {
@@ -108,127 +160,10 @@ function calculatePolygonOrientation(points) {
 window.calculatePolygonOrientation = calculatePolygonOrientation;
 window.SVGProcessing.Holes.calculatePolygonOrientation = calculatePolygonOrientation;
 
-// Enhanced hole validation with orientation check
-function validateHole(holePath, outerShape, svgCenterX, svgCenterY, effectiveScale) {
-    const pointsForHoles = Math.round(24 * svgResolution);
-    const originalHolePoints = holePath.getPoints(pointsForHoles);
-    
-    if (originalHolePoints.length < 3) {
-        console.warn(`Hole validation: Not enough points in hole (${originalHolePoints.length}). Minimum 3 required.`);
-        return null;
-    }
-    
-    const filteredHolePoints = [];
-    let lastX = null, lastY = null;
-    
-    for (const p of originalHolePoints) {
-        if (lastX === null || lastY === null || 
-            (Math.abs(p.x - lastX) > 0.0001 || Math.abs(p.y - lastY) > 0.0001)) {
-            filteredHolePoints.push(p);
-            lastX = p.x;
-            lastY = p.y;
-        }
-    }
-    
-    if (filteredHolePoints.length < 3) {
-        console.warn(`Hole validation: Too few points after filtering duplicates (${filteredHolePoints.length}). Minimum 3 required.`);
-        return null;
-    }
-    
-    const transformedHolePoints = filteredHolePoints.map(p => 
-        new THREE.Vector2(
-            (p.x - svgCenterX) * effectiveScale,
-            (p.y - svgCenterY) * -effectiveScale 
-        )
-    );
-    
-    let area = 0;
-    for (let i = 0, j = transformedHolePoints.length - 1; i < transformedHolePoints.length; j = i++) {
-        area += (transformedHolePoints[j].x + transformedHolePoints[i].x) * 
-                (transformedHolePoints[j].y - transformedHolePoints[i].y);
-    }
-    area = Math.abs(area / 2);
-    
-    if (area < 0.0001) {
-        console.warn(`Hole validation: Hole has effectively zero area (${area.toFixed(6)})`);
-        return null;
-    }
-    
-    // Get outer shape points for testing
-    const outerShapePoints = outerShape.getPoints(48);
-    
-    // Check multiple points to see if hole is inside shape
-    const holeCenter = getShapeCenter(transformedHolePoints);
-    const inPolygonTests = [];
-    
-    // Test center point
-    inPolygonTests.push({
-        point: holeCenter,
-        inside: isPointInPolygon(holeCenter, outerShapePoints)
-    });
-    
-    // Test a few more points around the shape in case the center is unreliable
-    for (let i = 0; i < Math.min(transformedHolePoints.length, 4); i++) {
-        const idx = Math.floor(i * transformedHolePoints.length / 4);
-        const point = transformedHolePoints[idx];
-        inPolygonTests.push({
-            point: point,
-            inside: isPointInPolygon(point, outerShapePoints)
-        });
-    }
-    
-    // If most points are inside, we consider it a valid hole
-    const insideCount = inPolygonTests.filter(test => test.inside).length;
-    if (insideCount < Math.ceil(inPolygonTests.length / 2)) {
-        console.warn(`Hole validation: Insufficient points (${insideCount}/${inPolygonTests.length}) inside the outer shape`);
-        return null;
-    }
-    
-    // Get orientation of hole and shape
-    const holeOrientation = calculatePolygonOrientation(transformedHolePoints);
-    const shapeOrientation = calculatePolygonOrientation(outerShapePoints);
-    
-    // Check whether hole orientation needs reversal
-    const needsReversal = Math.sign(holeOrientation) === Math.sign(shapeOrientation);
-    
-    // Create the final hole path with correct winding direction
-    const finalHolePath = new THREE.Path();
-    
-    // If orientations are the same, reverse the hole points for proper subtraction
-    if (needsReversal) {
-        console.log(`Hole validation: Reversing hole winding direction for proper subtraction`);
-        const reversedPoints = [...transformedHolePoints].reverse();
-        finalHolePath.moveTo(reversedPoints[0].x, reversedPoints[0].y);
-        for (let k = 1; k < reversedPoints.length; k++) {
-            finalHolePath.lineTo(reversedPoints[k].x, reversedPoints[k].y);
-        }
-    } else {
-        // Normal case - use original points
-        finalHolePath.moveTo(transformedHolePoints[0].x, transformedHolePoints[0].y);
-        for (let k = 1; k < transformedHolePoints.length; k++) {
-            finalHolePath.lineTo(transformedHolePoints[k].x, transformedHolePoints[k].y);
-        }
-    }
-    
-    finalHolePath.closePath(); 
-    finalHolePath.userData = { 
-        area: area,
-        orientation: holeOrientation,
-        originalHolePoints: transformedHolePoints,
-        isHole: true,
-        needsReversal: needsReversal
-    };
-    
-    console.log(`Hole validation: Valid hole with area ${area.toFixed(4)}`);
-    return finalHolePath;
-}
-
-window.validateHole = validateHole;
-window.SVGProcessing.Holes.validateHole = validateHole;
-
 // New function to debug hole geometry to help troubleshoot subtraction issues
 function debugHoleGeometry(shape, holeColor = 0xff0000) {
-    const shapePoints = shape.getPoints(24);
+    const settings = window.svgGlobalSettings;
+    const shapePoints = shape.getPoints(settings.pointSampling.getPoints('default'));
     const shapeGeometry = new THREE.BufferGeometry();
     const positions = [];
     
@@ -248,7 +183,7 @@ function debugHoleGeometry(shape, holeColor = 0xff0000) {
         for (const hole of shape.holes) {
             if (!hole || !hole.getPoints) continue;
             
-            const holePoints = hole.getPoints(24);
+            const holePoints = hole.getPoints(settings.pointSampling.getPoints('default'));
             const holeGeometry = new THREE.BufferGeometry();
             const holePositions = [];
             
@@ -272,15 +207,12 @@ window.SVGProcessing.Holes.debugHoleGeometry = debugHoleGeometry;
 
 // Improve hole detection to analyze based on winding direction and containment
 function detectHoles(paths, outerShape, svgCenterX, svgCenterY, effectiveScale) {
-    // Get configuration with fallbacks
-    const holeConfig = window.svgHoleDetectionSettings || {
-        areaRatioThreshold: 0.5,
-        aggressiveness: 0.7,
-        zeroAreaThreshold: 0.0001
-    };
+    const settings = window.svgGlobalSettings;
+    // Get configuration with fallbacks to new settings structure
+    const holeConfig = settings.holeDetection;
     
     const potentialHoles = [];
-    const outerPoints = outerShape.getPoints(24);
+    const outerPoints = outerShape.getPoints(settings.pointSampling.getPoints('default'));
     const outerArea = Math.abs(calculateShapeArea({getPoints: () => outerPoints}));
     const outerOrientation = calculatePolygonOrientation(outerPoints);
     
@@ -294,7 +226,7 @@ function detectHoles(paths, outerShape, svgCenterX, svgCenterY, effectiveScale) 
     for (const path of paths) {
         if (path === outerShape) continue; // Skip the outer shape itself
         
-        const pathPoints = path.getPoints(24);
+        const pathPoints = path.getPoints(settings.pointSampling.getPoints('default'));
         
         // If the path has few points, skip it
         if (pathPoints.length < 3) continue;
@@ -303,7 +235,7 @@ function detectHoles(paths, outerShape, svgCenterX, svgCenterY, effectiveScale) 
         const pathCenter = getShapeCenter(pathPoints);
         
         // Apply aggressiveness to point containment - higher aggressiveness is more lenient
-        const pointsToCheck = Math.min(5, pathPoints.length);
+        const pointsToCheck = Math.min(holeConfig.pointsToCheck, pathPoints.length);
         let insideCount = isPointInPolygon(pathCenter, outerPoints) ? 1 : 0;
         
         // With high aggressiveness, we only check the center point
@@ -338,7 +270,7 @@ function detectHoles(paths, outerShape, svgCenterX, svgCenterY, effectiveScale) 
         
         // Extra check for bowl-like shapes: if the shape has very few points and simple geometry, 
         // it's more likely to be a separate component like the bowl base
-        if (pathPoints.length < 8 && pathArea < outerArea * 0.1) {
+        if (pathPoints.length < holeConfig.simpleShapeMaxPoints && pathArea < outerArea * holeConfig.simpleShapeAreaRatioThreshold) {
             console.log(`Simple shape test: Simple shape with ${pathPoints.length} points and small area ratio ${(pathArea/outerArea).toFixed(4)} - likely a separate component, not a hole`);
             continue;
         }
@@ -362,10 +294,13 @@ function detectHoles(paths, outerShape, svgCenterX, svgCenterY, effectiveScale) 
 
 // Add more debug info to face detection
 function detectFaceLikePattern(paths) {
+    const settings = window.svgGlobalSettings;
+    const faceConfig = settings.faceDetection;
+
     console.log("DEBUG: detectFaceLikePattern called with", paths ? paths.length : 0, "paths");
     
-    if (!paths || !Array.isArray(paths) || paths.length < 2 || paths.length > 8) {
-        console.log("DEBUG: Quick reject - path count outside face range (2-8):", paths ? paths.length : 0);
+    if (!paths || !Array.isArray(paths) || paths.length < faceConfig.minComponents || paths.length > faceConfig.maxComponents) {
+        console.log(`DEBUG: Quick reject - path count (${paths ? paths.length : 0}) outside face range (${faceConfig.minComponents}-${faceConfig.maxComponents})`);
         return false;
     }
     
@@ -376,15 +311,16 @@ function detectFaceLikePattern(paths) {
         try {
             // Get all points from this path
             let allPoints = [];
+            const samplingPoints = settings.pointSampling.getPoints('faceComponent');
             
             if (typeof path.getPoints === 'function') {
-                allPoints = path.getPoints(24);
+                allPoints = path.getPoints(samplingPoints);
                 console.log("DEBUG: Path has getPoints function, got", allPoints.length, "points");
             } else if (path.subPaths && Array.isArray(path.subPaths)) {
                 console.log("DEBUG: Path has", path.subPaths.length, "subPaths");
                 for (const subPath of path.subPaths) {
                     if (typeof subPath.getPoints === 'function') {
-                        const subPathPoints = subPath.getPoints(24);
+                        const subPathPoints = subPath.getPoints(samplingPoints);
                         allPoints = allPoints.concat(subPathPoints);
                         console.log("DEBUG: SubPath added", subPathPoints.length, "points");
                     }
@@ -413,7 +349,7 @@ function detectFaceLikePattern(paths) {
                 console.log(`DEBUG: Component center: (${centerX.toFixed(1)}, ${centerY.toFixed(1)}), size: ${width.toFixed(1)}x${height.toFixed(1)}`);
                 
                 // Skip tiny components
-                if (area < 0.0001) {
+                if (area < faceConfig.componentMinArea) {
                     console.log("DEBUG: Component too small, skipping (area:", area, ")");
                     continue;
                 }
@@ -431,9 +367,9 @@ function detectFaceLikePattern(paths) {
         }
     }
     
-    // Need at least 2 valid components
-    if (components.length < 2) {
-        console.log("DEBUG: Not enough valid components:", components.length);
+    // Need at least faceConfig.minComponents valid components
+    if (components.length < faceConfig.minComponents) {
+        console.log("DEBUG: Not enough valid components:", components.length, " (min required: ", faceConfig.minComponents, ")");
         return false;
     }
     
@@ -494,12 +430,17 @@ function detectFaceLikePattern(paths) {
         console.log("  - Mouth below left eye:", mouthBelowLeft);
         console.log("  - Mouth below right eye:", mouthBelowRight);
         console.log("  - Mouth centered between eyes:", mouthIsCentered);
+        
+        // Check using configured ratio for eye alignment
+        const eyesHorizontallyAlignedEnough = (eyesXDiff === 0 && eyesYDiff < (topTwo[0].height + topTwo[1].height)/4) || (eyesXDiff > 0 && (eyesYDiff / eyesXDiff) < faceConfig.threeComponent.maxEyesYDiffToXDiffRatio);
+
+        console.log("  - Eyes horizontally aligned enough (based on config):", eyesHorizontallyAlignedEnough);
         console.log("  - Face pattern detected:", (mouthBelowLeft && mouthBelowRight && 
-            (mouthIsCentered || eyesYDiff < eyesXDiff)));
+            (mouthIsCentered || eyesHorizontallyAlignedEnough)));
         
         // If most face-like conditions are met, consider it a face
         if (mouthBelowLeft && mouthBelowRight && 
-            (mouthIsCentered || eyesYDiff < eyesXDiff)) {
+            (mouthIsCentered || eyesHorizontallyAlignedEnough)) {
             console.log("DEBUG: Face pattern confirmed with 3 components");
             return true;
         }
@@ -507,8 +448,7 @@ function detectFaceLikePattern(paths) {
     
     // Check if the filename suggests a face
     if (window.currentSvgFilename) {
-        const facePatternsInFilename = /face|smile|emoji|emo|emote|emotion|grin|laugh|eye|mouth/i;
-        if (facePatternsInFilename.test(window.currentSvgFilename)) {
+        if (faceConfig.filenameKeywords.test(window.currentSvgFilename)) {
             console.log(`DEBUG: Detected likely face SVG based on filename: ${window.currentSvgFilename}`);
             return true;
         }
@@ -522,12 +462,13 @@ function detectFaceLikePattern(paths) {
 function processHoles(shape, potentialHoles, svgCenterX, svgCenterY, effectiveScale) {
     if (!potentialHoles || potentialHoles.length === 0) return;
     
+    const settings = window.svgGlobalSettings;
     console.log(`Processing ${potentialHoles.length} potential holes for shape`);
     
     for (const holeInfo of potentialHoles) {
         try {
             const holePath = holeInfo.path;
-            const points = holePath.getPoints(24);
+            const points = holePath.getPoints(settings.pointSampling.getPoints('default'));
             
             // Transform points to match the shape coordinate system
             const transformedPoints = points.map(p => 
@@ -576,15 +517,13 @@ window.detectHoles = detectHoles;
 window.processHoles = processHoles;
 
 // Improve the validateHole function to handle complex cases and use config parameters
+// This is the consolidated version of validateHole.
 function validateHole(holePath, outerShape, svgCenterX, svgCenterY, effectiveScale) {
-    // Get configuration parameters with fallbacks
-    const holeConfig = window.svgHoleDetectionSettings || {
-        areaRatioThreshold: 0.5,
-        pointsInsideThreshold: 0.6,
-        zeroAreaThreshold: 0.0001
-    };
+    const settings = window.svgGlobalSettings;
+    // Get configuration parameters from the new settings structure
+    const holeConfig = settings.holeValidation;
     
-    const pointsForHoles = Math.round(24 * svgResolution);
+    const pointsForHoles = settings.pointSampling.getPoints('default');
     const originalHolePoints = holePath.getPoints(pointsForHoles);
     
     if (originalHolePoints.length < 3) {
@@ -597,7 +536,7 @@ function validateHole(holePath, outerShape, svgCenterX, svgCenterY, effectiveSca
     
     for (const p of originalHolePoints) {
         if (lastX === null || lastY === null || 
-            (Math.abs(p.x - lastX) > 0.0001 || Math.abs(p.y - lastY) > 0.0001)) {
+            (Math.abs(p.x - lastX) > holeConfig.duplicatePointThreshold || Math.abs(p.y - lastY) > holeConfig.duplicatePointThreshold)) {
             filteredHolePoints.push(p);
             lastX = p.x;
             lastY = p.y;
@@ -630,7 +569,7 @@ function validateHole(holePath, outerShape, svgCenterX, svgCenterY, effectiveSca
     }
     
     // Get outer shape points for testing
-    const outerShapePoints = outerShape.getPoints(48);
+    const outerShapePoints = outerShape.getPoints(settings.pointSampling.getPoints('detailed'));
     
     // Calculate outer shape area to check size relationship
     const outerShapeArea = Math.abs(calculateShapeArea({getPoints: () => outerShapePoints}));
@@ -652,8 +591,9 @@ function validateHole(holePath, outerShape, svgCenterX, svgCenterY, effectiveSca
     });
     
     // Test a few more points around the shape in case the center is unreliable
-    for (let i = 0; i < Math.min(transformedHolePoints.length, 4); i++) {
-        const idx = Math.floor(i * transformedHolePoints.length / 4);
+    const maxExtraPoints = Math.min(transformedHolePoints.length, holeConfig.maxPointsToTestInside);
+    for (let i = 0; i < maxExtraPoints; i++) {
+        const idx = Math.floor(i * transformedHolePoints.length / maxExtraPoints); // Distribute points more evenly
         const point = transformedHolePoints[idx];
         inPolygonTests.push({
             point: point,
@@ -708,3 +648,5 @@ function validateHole(holePath, outerShape, svgCenterX, svgCenterY, effectiveSca
     console.log(`Hole validation: Valid hole with area ${area.toFixed(4)}`);
     return finalHolePath;
 }
+window.validateHole = validateHole;
+window.SVGProcessing.Holes.validateHole = validateHole;

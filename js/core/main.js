@@ -14,9 +14,13 @@ async function init() {
 
         initScene();
         
-        // Initialize extrudedGroup for SVG extrusions
+        // Initialize extrudedGroup for SVG extrusions and assign to window
         window.extrudedGroup = new THREE.Group();
-        scene.add(window.extrudedGroup);
+        if (window.scene) { // Ensure scene is available
+            window.scene.add(window.extrudedGroup);
+        } else {
+            console.error("Scene not initialized before adding extrudedGroup.");
+        }
         
         camera.position.set(0, 20, 30);
         camera.lookAt(0, 0, 0);

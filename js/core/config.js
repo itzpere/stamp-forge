@@ -3,44 +3,8 @@
  * Replaces scattered global variables with a structured approach
  */
 
-// Initialize hole detection settings if they don't exist
-if (!window.StampForgeConfig) {
-    window.StampForgeConfig = {};
-}
-
-if (!window.StampForgeConfig.svg) {
-    window.StampForgeConfig.svg = {
-        scale: 1.0,
-        resolution: 1.0,
-        assumeCCW: true
-    };
-}
-
-if (!window.StampForgeConfig.svg.holeDetection) {
-    window.StampForgeConfig.svg.holeDetection = {
-        areaRatioThreshold: 0.5,
-        pointsInsideThreshold: 0.6,
-        zeroAreaThreshold: 0.0001,
-        aggressiveness: 0.7
-    };
-}
-
-// Create a global accessor for hole detection settings
-if (!window.svgHoleDetectionSettings) {
-    Object.defineProperty(window, 'svgHoleDetectionSettings', {
-        get: function() {
-            return window.StampForgeConfig.svg.holeDetection;
-        },
-        set: function(newSettings) {
-            if (newSettings && typeof newSettings === 'object') {
-                Object.assign(window.StampForgeConfig.svg.holeDetection, newSettings);
-            }
-        },
-        configurable: true
-    });
-}
-
-console.log("Configuration system initialized with hole detection settings:", window.svgHoleDetectionSettings);
+// Initialize StampForgeConfig if it doesn't exist
+window.StampForgeConfig = window.StampForgeConfig || {};
 
 // Create a global configuration object
 window.StampForgeConfig = {
@@ -53,7 +17,7 @@ window.StampForgeConfig = {
             areaRatioThreshold: 0.5, // Max ratio of hole area to parent shape area (0-1)
             pointsInsideThreshold: 0.6, // Percentage of points required to be inside (0-1)
             zeroAreaThreshold: 0.0001, // Minimum area to not be considered zero
-            aggressiveness: 0.1      // Overall aggressiveness of hole detection (0-1)
+            aggressiveness: 0.1      // Overall aggressiveness of hole detection (0-1) // Default was 0.7, ensure this is intended
         }
     },
     
@@ -159,11 +123,60 @@ Object.defineProperties(window, {
     
     // Add accessor for hole detection settings
     'svgHoleDetectionSettings': {
-        get: () => window.StampForgeConfig.svg.holeDetection,
+        get: () => {
+            // Ensure the path exists
+            if (!window.StampForgeConfig.svg) window.StampForgeConfig.svg = {};
+            if (!window.StampForgeConfig.svg.holeDetection) {
+                 window.StampForgeConfig.svg.holeDetection = { // Default values if not set
+                    areaRatioThreshold: 0.5,
+                    pointsInsideThreshold: 0.6,
+                    zeroAreaThreshold: 0.0001,
+                    aggressiveness: 0.1 // Default was 0.7
+                };
+            }
+            return window.StampForgeConfig.svg.holeDetection;
+        },
         set: (value) => { 
+            if (!window.StampForgeConfig.svg) window.StampForgeConfig.svg = {};
             if (value && typeof value === 'object') {
-                Object.assign(window.StampForgeConfig.svg.holeDetection, value);
+                window.StampForgeConfig.svg.holeDetection = Object.assign(window.StampForgeConfig.svg.holeDetection || {}, value);
             }
         }
     }
 });
+
+// The initial setup block for svgHoleDetectionSettings before the main StampForgeConfig object
+// is now redundant due to the getter ensuring defaults.
+// We can remove the following:
+// if (!window.StampForgeConfig) {
+//     window.StampForgeConfig = {};
+// }
+// if (!window.StampForgeConfig.svg) {
+//     window.StampForgeConfig.svg = {
+//         scale: 1.0,
+//         resolution: 1.0,
+//         assumeCCW: true
+//     };
+// }
+// if (!window.StampForgeConfig.svg.holeDetection) {
+//     window.StampForgeConfig.svg.holeDetection = {
+//         areaRatioThreshold: 0.5,
+//         pointsInsideThreshold: 0.6,
+//         zeroAreaThreshold: 0.0001,
+//         aggressiveness: 0.7
+//     };
+// }
+// if (!window.svgHoleDetectionSettings) {
+//     Object.defineProperty(window, 'svgHoleDetectionSettings', {
+//         get: function() {
+//             return window.StampForgeConfig.svg.holeDetection;
+//         },
+//         set: function(newSettings) {
+//             if (newSettings && typeof newSettings === 'object') {
+//                 Object.assign(window.StampForgeConfig.svg.holeDetection, newSettings);
+//             }
+//         },
+//         configurable: true
+//     });
+// }
+// console.log("Configuration system initialized with hole detection settings:", window.svgHoleDetectionSettings);

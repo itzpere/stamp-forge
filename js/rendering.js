@@ -145,13 +145,7 @@ window.fitCameraToObject = function(offset = 1.5) {
     window.render();
 };
 
-window.scheduleProgressiveRendering = function() {
-    console.log("Progressive rendering scheduled");
-};
-
-window.cancelProgressiveRendering = function() {
-    console.log("Progressive rendering cancelled");
-};
+// Remove stub functions as full implementations are in js/utils/utilities.js
 
 window.isUserInteracting = false;
 window.pendingUpdate = false;
