@@ -2,11 +2,35 @@ let selectedBaseId = 'default';
 let previewRenderers = []; 
 let modalDisplayed = false; 
 
-async function initBaseSelector() { 
+// Add these global variables at the top of the file
+let stampBase = null;
+let scene = null;
+
+// Don't redeclare brickColor, check if it exists globally
+if (typeof window.brickColor === 'undefined') {
+    window.brickColor = 0xbc8f8f;
+}
+
+// Use the existing global brickDimensions or create it if it doesn't exist
+if (typeof window.brickDimensions === 'undefined') {
+    window.brickDimensions = {
+        width: 20,
+        height: 3,
+        depth: 20
+    };
+}
+
+async function initBaseSelector() {
     const chooseBaseBtn = document.getElementById('chooseBaseBtn');
     const baseSelectModal = document.getElementById('baseSelectModal');
     const baseDesignsGrid = document.getElementById('baseDesignsGrid');
     const closeBtn = baseSelectModal.querySelector('.close');
+    
+    // Initialize scene reference from global
+    if (!scene && window.scene) {
+        scene = window.scene;
+        console.log("Initialized local scene reference from global scene");
+    }
     
     await loadBaseDesigns(); 
     
@@ -197,6 +221,158 @@ function createUploadCard() {
     return card;
 }
 
+// Add the missing importStampBase function
+function importStampBase(event) {
+    if (!event.target.files || event.target.files.length === 0) {
+        console.warn('No files selected for import');
+        return;
+    }
+    
+    const file = event.target.files[0];
+    if (!file.name.toLowerCase().endsWith('.stl')) {
+        alert('Please select an STL file for the stamp base');
+        return;
+    }
+    
+    // Clear any existing extruded SVG designs when importing a new base
+    clearExtrudedDesigns();
+    
+    // ALWAYS clear SVG designs forcefully before uploading new base
+    if (!clearExtrudedDesigns()) {
+        console.error("Failed to clear existing designs. Visual artifacts may remain.");
+    }
+    
+    const loadingElement = document.getElementById('loading');
+    if (loadingElement) {
+        loadingElement.textContent = 'Loading custom base...';
+        loadingElement.classList.remove('hidden');
+    }
+    
+    // Initialize scene if it doesn't exist
+    if (!scene && window.scene) {
+        scene = window.scene;
+    }
+    
+    // Get the color from global config if available
+    if (window.brickColor !== undefined) {
+        brickColor = window.brickColor;
+    }
+    
+    // Get dimensions from global config if available
+    if (window.brickDimensions) {
+        brickDimensions = window.brickDimensions;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const contents = e.target.result;
+        
+        // Load the STL data directly
+        const loader = new THREE.STLLoader();
+        try {
+            const geometry = loader.parse(contents);
+            
+            const material = new THREE.MeshStandardMaterial({
+                color: brickColor,
+                roughness: 0.5,
+                metalness: 0.2,
+                side: THREE.DoubleSide
+            });
+            
+            // Get reference to stampBase from window if it exists
+            if (window.stampBase) {
+                stampBase = window.stampBase;
+            }
+            
+            // Remove existing stamp base if any
+            if (stampBase && scene) {
+                scene.remove(stampBase);
+                if (stampBase.geometry) stampBase.geometry.dispose();
+                if (stampBase.material) {
+                    if (Array.isArray(stampBase.material)) {
+                        stampBase.material.forEach(m => m.dispose());
+                    } else {
+                        stampBase.material.dispose();
+                    }
+                }
+            }
+            
+            // Create new stamp base mesh
+            stampBase = new THREE.Mesh(geometry, material);
+            
+            // Apply the same 270-degree X-axis rotation as in loadBaseSTL
+            const defaultXRotation = THREE.MathUtils.degToRad(270);
+            stampBase.rotation.set(defaultXRotation, 0, 0);
+            console.log("Applied default 270° X-axis rotation to uploaded base");
+            
+            // Make sure it's available globally
+            window.stampBase = stampBase;
+            
+            // Calculate and update dimensions from the geometry
+            geometry.computeBoundingBox();
+            const boundingBox = geometry.boundingBox;
+            const size = new THREE.Vector3();
+            boundingBox.getSize(size);
+            
+            // Center the geometry
+            const center = new THREE.Vector3();
+            boundingBox.getCenter(center);
+            geometry.translate(-center.x, -boundingBox.min.y, -center.z);
+            
+            // Update dimensions
+            brickDimensions.width = size.x;
+            brickDimensions.height = size.y;
+            brickDimensions.depth = size.z;
+            
+            // Add to scene
+            scene.add(stampBase);
+            
+            // Update top surface for extrusion positioning
+            if (typeof window.updateAndApplyBaseTopSurface === 'function') {
+                window.updateAndApplyBaseTopSurface();
+            } else {
+                updateBaseTopSurfaceLocal();
+            }
+            
+            console.log(`Custom base imported: ${file.name}`);
+            console.log(`Dimensions set to: ${brickDimensions.width.toFixed(2)} × ${brickDimensions.height.toFixed(2)} × ${brickDimensions.depth.toFixed(2)}`);
+            
+            // Mark as custom base
+            selectedBaseId = 'custom';
+            
+            // Enable download button
+            const downloadButton = document.getElementById('downloadSTL');
+            if (downloadButton) {
+                downloadButton.disabled = false;
+            }
+            
+            // Adjust camera view
+            setTimeout(fitCameraToObject, 100);
+            
+            if (loadingElement) {
+                loadingElement.classList.add('hidden');
+            }
+            
+        } catch (error) {
+            console.error('Error parsing STL file:', error);
+            alert('Failed to load STL file. The file may be corrupt or in an unsupported format.');
+            if (loadingElement) {
+                loadingElement.classList.add('hidden');
+            }
+        }
+    };
+    
+    reader.onerror = function() {
+        console.error('Error reading file');
+        alert('Error reading the file. Please try again.');
+        if (loadingElement) {
+            loadingElement.classList.add('hidden');
+        }
+    };
+    
+    reader.readAsArrayBuffer(file);
+}
+
 function startPreviewRenderers() {
     const previewElements = document.querySelectorAll('.base-design-preview[data-stl-file]');
     
@@ -306,20 +482,189 @@ function selectBaseDesign(design) {
         selectedCard.classList.add('selected');
     }
     
-    loadBaseSTL(design.file, design.config);
+    // ALWAYS clear SVG designs forcefully before changing base
+    if (!clearExtrudedDesigns()) {
+        console.error("Failed to clear existing designs. Visual artifacts may remain.");
+    }
     
-    const baseSelectModal = document.getElementById('baseSelectModal');
-    baseSelectModal.style.display = 'none';
-    stopPreviewRenderers();
+    // Make sure no callbacks are triggered during the 100ms we wait
+    const pendingCallbacks = [];
+    if (window._pendingSVGProcessingCalls) {
+        pendingCallbacks.push(...window._pendingSVGProcessingCalls);
+        window._pendingSVGProcessingCalls = [];
+    }
+    
+    // Add a delay before loading the new base to ensure cleanup is complete
+    setTimeout(() => {
+        loadBaseSTL(design.file, design.config);
+        
+        const baseSelectModal = document.getElementById('baseSelectModal');
+        baseSelectModal.style.display = 'none';
+        stopPreviewRenderers();
+    }, 100);
+}
+
+// Replace the existing clearExtrudedDesigns function with this more aggressive version
+function clearExtrudedDesigns() {
+    console.log("AGGRESSIVE CLEARING of all extruded designs and SVG data");
+    
+    try {
+        // Clear the extrudedGroup contents
+        if (window.extrudedGroup) {
+            console.log(`Starting with ${window.extrudedGroup.children.length} children in extrudedGroup`);
+            
+            // Remove all extruded shapes
+            while(window.extrudedGroup.children.length > 0) {
+                const child = window.extrudedGroup.children[0];
+                window.extrudedGroup.remove(child);
+                
+                if (child.geometry) {
+                    child.geometry.dispose();
+                    child.geometry = null;
+                }
+                
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(m => {
+                            m.dispose();
+                            m = null;
+                        });
+                    } else {
+                        child.material.dispose();
+                        child.material = null;
+                    }
+                }
+            }
+            
+            // Force update of the scene
+            window.extrudedGroup.updateMatrixWorld(true);
+            console.log(`After clearing: ${window.extrudedGroup.children.length} children in extrudedGroup`);
+        }
+        
+        // Create a completely new extrudedGroup to ensure clean state
+        if (window.scene && window.extrudedGroup) {
+            window.scene.remove(window.extrudedGroup);
+            window.extrudedGroup = new THREE.Group();
+            window.extrudedGroup.position.set(0, 0, 0);
+            window.scene.add(window.extrudedGroup);
+            console.log("Created fresh extrudedGroup");
+        }
+        
+        // Reset ALL related global state
+        window.lastSvgData = null;
+        window.previousSvgData = null;
+        window.currentSvgFilename = null;
+        window._pendingSVGProcessingCalls = [];
+        
+        // Reset shape information
+        window.shapeRenderInfo = [];
+        window.shapeColorCounter = 0;
+        
+        // Reset UI elements - FIX THE SVG UPLOAD HANDLING
+        try {
+            // Get a reference to the SVG upload input
+            const svgUpload = document.getElementById('svgUpload');
+            
+            // If the element exists and we can safely reset it
+            if (svgUpload) {
+                // Method 1: Reset the value (safest way)
+                svgUpload.value = '';
+                
+                // Method 2: If the original event listener needs to be preserved
+                // but we don't need to do DOM manipulation
+                if (svgUpload.parentNode) {
+                    try {
+                        const newUpload = document.createElement('input');
+                        newUpload.type = 'file';
+                        newUpload.id = 'svgUpload';
+                        newUpload.accept = '.svg';
+                        
+                        // Store the parent before removing the original
+                        const parent = svgUpload.parentNode;
+                        
+                        // Remove the original
+                        parent.removeChild(svgUpload);
+                        
+                        // Add the new element
+                        parent.appendChild(newUpload);
+                        
+                        // Add event listener to the new element
+                        newUpload.addEventListener('change', function(event) {
+                            if (event.target.files && event.target.files.length > 0) {
+                                const file = event.target.files[0];
+                                if (typeof window.handleSVGUpload === 'function') {
+                                    window.handleSVGUpload(file);
+                                }
+                            }
+                        });
+                        
+                        console.log("SVG upload input replaced successfully");
+                    } catch (replaceError) {
+                        console.error("Error replacing SVG upload element:", replaceError);
+                        // Fallback to just clearing the value
+                        svgUpload.value = '';
+                    }
+                } else {
+                    // If we can't replace it, just clear its value
+                    console.log("SVG upload has no parent node, just clearing value");
+                    svgUpload.value = '';
+                }
+            } else {
+                console.log("SVG upload element not found in DOM");
+            }
+        } catch (uiError) {
+            console.error("Error handling SVG upload element:", uiError);
+        }
+        
+        // Clear any module-specific caches
+        if (window.SVGProcessing) {
+            if (window.SVGProcessing.cache) window.SVGProcessing.cache = {};
+            if (window.SVGProcessing.processedPaths) window.SVGProcessing.processedPaths = {};
+            if (window.SVGProcessing.lastProcessedData) window.SVGProcessing.lastProcessedData = null;
+        }
+        
+        // Update the UI
+        if (typeof window.populateShapeList === 'function') {
+            window.populateShapeList();
+        }
+        
+        // Force a complete rebuild of all scenes
+        if (window.renderer && window.scene && window.camera) {
+            window.renderer.clear();
+            window.renderer.render(window.scene, window.camera);
+        }
+        
+        console.log("COMPLETE RESET: All SVG geometry and data has been forcefully cleared");
+    } catch (error) {
+        console.error("Error during aggressive SVG cleanup:", error);
+    }
+    
+    // Return true to indicate function ran
+    return true;
 }
 
 function loadBaseSTL(file, config) {
     const loader = new THREE.STLLoader();
-    const loadingElement = document.getElementById('loading'); // Get the loading element
+    const loadingElement = document.getElementById('loading');
 
-    if (loadingElement) { // Show loading message
+    if (loadingElement) {
         loadingElement.textContent = 'Loading base...';
         loadingElement.classList.remove('hidden');
+    }
+    
+    // Ensure scene is initialized before proceeding
+    if (!scene && window.scene) {
+        scene = window.scene;
+        console.log("Retrieved scene reference for STL loading");
+    }
+    
+    if (!scene) {
+        console.error("Scene is not available. Cannot load base STL.");
+        alert("Error: 3D scene is not initialized. Please refresh the page.");
+        if (loadingElement) {
+            loadingElement.classList.add('hidden');
+        }
+        return;
     }
     
     loader.load(
@@ -338,13 +683,22 @@ function loadBaseSTL(file, config) {
             geometry.computeBoundingBox();            
             const boundingBox = geometry.boundingBox;
 
+            // Apply default 270-degree X rotation instead of 90-degree
+            // This rotates in the correct direction to sit on the ground plane
+            const defaultXRotation = THREE.MathUtils.degToRad(270);
+            
             if (config && config.rotation) {
+                // Apply configuration rotation on top of the default 270-degree rotation
                 stampBase.rotation.set(
-                    THREE.MathUtils.degToRad(config.rotation.x || 0),
+                    defaultXRotation + THREE.MathUtils.degToRad(config.rotation.x || 0),
                     THREE.MathUtils.degToRad(config.rotation.y || 0),
                     THREE.MathUtils.degToRad(config.rotation.z || 0)
                 );
-                // console.log(`Applied rotation from config: X=${config.rotation.x}, Y=${config.rotation.y}, Z=${config.rotation.z} degrees`);
+                console.log(`Applied rotation from config + 270° X-axis: X=${270 + (config.rotation.x || 0)}, Y=${config.rotation.y}, Z=${config.rotation.z} degrees`);
+            } else {
+                // Just apply the default 270-degree rotation if no config rotation
+                stampBase.rotation.set(defaultXRotation, 0, 0);
+                console.log("Applied default 270° X-axis rotation");
             }
             
             if (config && typeof config.height === 'number') {
@@ -532,13 +886,21 @@ function rotateBase(axis) {
 
 function resetBaseRotation() {
     if (!stampBase) {
-        console.warn('No stamp base to reset rotation');
+        console.warn('No stamp base to reset rotation')
         return;
     }
     
-    stampBase.rotation.set(0, 0, 0);
+    // Reset to default 270-degree X rotation (converted to radians)
+    const defaultXRotation = THREE.MathUtils.degToRad(270);
+    stampBase.rotation.set(defaultXRotation, 0, 0);
     
-    console.log('Reset base rotation to default');
+    console.log('Reset base rotation to default (270° X, 0° Y, 0° Z)');
+    
+    if (typeof updateAndApplyBaseTopSurface === 'function') {
+        updateAndApplyBaseTopSurface(); 
+    } else if (typeof updateBaseTopSurfaceLocal === 'function') {
+        updateBaseTopSurfaceLocal();
+    }
     
     if (renderer) renderer.render(scene, camera);
     
