@@ -162,7 +162,7 @@ function exportSTL() {
                             const exporter = new THREE.STLExporter();
                             const result = exporter.parse(exportGroup, { binary: true });
                             
-                            const sanitizedName = typeof currentSvgFilename !== 'undefined' ? 
+                            const sanitizedName = (typeof currentSvgFilename !== 'undefined' && currentSvgFilename !== null) ? 
                                 currentSvgFilename.replace(/[^\w\-\.]/g, '_') : 'stampforge';
                             const filename = `stampForge_${sanitizedName}.stl`;
                             
