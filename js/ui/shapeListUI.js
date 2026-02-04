@@ -112,7 +112,7 @@ function populateShapeList() {
         posXInput.className = 'shape-position-input';
         posXInput.id = `shape-pos-x-${shapeInfo.id}`;
         posXInput.step = '0.1';
-        posXInput.value = shapeInfo.mesh.position.x.toFixed(1);
+        posXInput.value = (shapeInfo.customPosition?.x ?? shapeInfo.mesh.position.x).toFixed(1);
         posXInput.addEventListener('change', () => {
             updateShapePosition(shapeInfo.id, 'x', parseFloat(posXInput.value));
         });
@@ -131,7 +131,7 @@ function populateShapeList() {
         posYInput.className = 'shape-position-input';
         posYInput.id = `shape-pos-y-${shapeInfo.id}`;
         posYInput.step = '0.1';
-        posYInput.value = shapeInfo.mesh.position.y.toFixed(1);
+        posYInput.value = (shapeInfo.customPosition?.y ?? shapeInfo.mesh.position.y).toFixed(1);
         posYInput.addEventListener('change', () => {
             updateShapePosition(shapeInfo.id, 'y', parseFloat(posYInput.value));
         });
@@ -150,7 +150,7 @@ function populateShapeList() {
         posZInput.className = 'shape-position-input';
         posZInput.id = `shape-pos-z-${shapeInfo.id}`;
         posZInput.step = '0.1';
-        posZInput.value = shapeInfo.mesh.position.z.toFixed(1);
+        posZInput.value = (shapeInfo.customPosition?.z ?? shapeInfo.mesh.position.z).toFixed(1);
         posZInput.addEventListener('change', () => {
             updateShapePosition(shapeInfo.id, 'z', parseFloat(posZInput.value));
         });
@@ -174,17 +174,18 @@ function updateShapePosition(shapeId, axis, value) {
         return;
     }
     
-    // Store original position for reference
-    if (!shapeInfo.originalPosition) {
-        shapeInfo.originalPosition = {
+    // Initialize customPosition if it doesn't exist
+    if (!shapeInfo.customPosition) {
+        shapeInfo.customPosition = {
             x: shapeInfo.mesh.position.x,
             y: shapeInfo.mesh.position.y,
             z: shapeInfo.mesh.position.z
         };
     }
     
-    // Update position property
+    // Update both the stored custom position and the mesh position
     if (axis === 'x' || axis === 'y' || axis === 'z') {
+        shapeInfo.customPosition[axis] = value;
         shapeInfo.mesh.position[axis] = value;
         
         // Force matrix update

@@ -112,9 +112,29 @@ function createExtrudedShapeWithId(shape, effectiveScaleFromParser_unused, lowQu
         // Calculate the correct position for the mesh
         const baseOffset = currentBaseTopSurfaceY || 0;
         const yOffset = validHeight / 2; // Center the extrusion vertically
-        const posY = baseOffset + extrusionPosition.y + yOffset;
-        const posX = extrusionPosition.x;
-        const posZ = extrusionPosition.z;
+        
+        // Check if this shape has a custom position stored
+        let posX = extrusionPosition.x;
+        let posY = baseOffset + extrusionPosition.y + yOffset;
+        let posZ = extrusionPosition.z;
+        
+        // First check existing shape info
+        if (existingShapeInfo && existingShapeInfo.customPosition) {
+            // Use the stored custom position from existing info
+            posX = existingShapeInfo.customPosition.x;
+            posY = existingShapeInfo.customPosition.y;
+            posZ = existingShapeInfo.customPosition.z;
+            console.log(`Using custom position for shape ${shapeId}: {x: ${posX}, y: ${posY}, z: ${posZ}}`);
+        } else if (window._preservedShapeData && window._preservedShapeData.has(shapeId)) {
+            // Check if there's preserved data for this new shape
+            const preserved = window._preservedShapeData.get(shapeId);
+            if (preserved.customPosition) {
+                posX = preserved.customPosition.x;
+                posY = preserved.customPosition.y;
+                posZ = preserved.customPosition.z;
+                console.log(`Using preserved custom position for shape ${shapeId}: {x: ${posX}, y: ${posY}, z: ${posZ}}`);
+            }
+        }
 
         mesh.position.set(posX, posY, posZ);
         
@@ -137,7 +157,7 @@ function createExtrudedShapeWithId(shape, effectiveScaleFromParser_unused, lowQu
             }
         } else {
             mesh.userData.shapeId = shapeId;
-            window.shapeRenderInfo.push({
+            const newShapeInfo = {
                 id: shapeId,
                 name: `Shape ${shapeId + 1}`,
                 mesh: mesh,
@@ -145,8 +165,28 @@ function createExtrudedShapeWithId(shape, effectiveScaleFromParser_unused, lowQu
                 operationType: 'extrude',
                 hasHoles: hasHoles,
                 holeCount: hasHoles ? shape.holes.length : 0
-            });
-            mesh.visible = true;
+            };
+            
+            // Restore preserved data if it exists
+            if (window._preservedShapeData && window._preservedShapeData.has(shapeId)) {
+                const preserved = window._preservedShapeData.get(shapeId);
+                if (preserved.customPosition) {
+                    newShapeInfo.customPosition = preserved.customPosition;
+                }
+                if (preserved.operationType !== undefined) {
+                    newShapeInfo.operationType = preserved.operationType;
+                }
+                if (preserved.isVisible !== undefined) {
+                    newShapeInfo.isVisible = preserved.isVisible;
+                }
+                if (preserved.useReversedWinding !== undefined) {
+                    newShapeInfo.useReversedWinding = preserved.useReversedWinding;
+                }
+                console.log(`Restored preserved data for shape ${shapeId}:`, preserved);
+            }
+            
+            window.shapeRenderInfo.push(newShapeInfo);
+            mesh.visible = newShapeInfo.isVisible;
         }
         
         // Log final mesh position

@@ -244,8 +244,23 @@ if (window.svgProcessingInitialized) {
         // console.log(`[parseSVGForExtrusion] Initial global svgScaleFactor: ${svgScaleFactor}`);
         // console.log(`[parseSVGForExtrusion] SVG Data Length: ${svgText ? svgText.length : 'null or undefined'}`);
 
+        // Preserve existing shape data (like customPosition) before clearing
+        const existingShapeData = new Map();
+        if (window.shapeRenderInfo && window.shapeRenderInfo.length > 0) {
+            window.shapeRenderInfo.forEach(info => {
+                existingShapeData.set(info.id, {
+                    customPosition: info.customPosition,
+                    operationType: info.operationType,
+                    isVisible: info.isVisible,
+                    useReversedWinding: info.useReversedWinding
+                });
+            });
+        }
+        
         window.shapeRenderInfo = []; 
         window.shapeColorCounter = 0; // Initialize shapeColorCounter
+        // Store the preserved data for restoration after shapes are recreated
+        window._preservedShapeData = existingShapeData;
         // console.log(`[DEBUG parseSVGForExtrusion] After RE-INITIALIZING, window.shapeRenderInfo length: ${window.shapeRenderInfo.length}, Content: ${JSON.stringify(window.shapeRenderInfo)}`);
 
         if (typeof populateShapeList === 'function') {
