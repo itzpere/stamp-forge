@@ -117,13 +117,6 @@ function exportSTL() {
         loadingElement.classList.remove('hidden');
         loadingElement.textContent = 'Preparing model for export...';
         
-        // Store original position values to restore later
-        const originalPosition = {
-            x: extrusionPosition.x,
-            y: extrusionPosition.y,
-            z: extrusionPosition.z
-        };
-        
         isHighQualityMode = true;
         
         setTimeout(() => {
@@ -141,11 +134,6 @@ function exportSTL() {
                             }
                         }
                     }
-                    
-                    // Always use the original position values, not the UI values which might have changed
-                    extrusionPosition.x = originalPosition.x;
-                    extrusionPosition.y = originalPosition.y;
-                    extrusionPosition.z = originalPosition.z;
                     
                     parseSVGForExtrusion(lastSvgData, false, 1.0, true);
                     
@@ -180,11 +168,6 @@ function exportSTL() {
                                 
                                 isHighQualityMode = false;
                                 if (typeof lastSvgData !== 'undefined' && lastSvgData) {
-                                    // Restore original position before re-rendering
-                                    extrusionPosition.x = originalPosition.x;
-                                    extrusionPosition.y = originalPosition.y;
-                                    extrusionPosition.z = originalPosition.z;
-                                    
                                     setTimeout(() => parseSVGForExtrusion(lastSvgData, false, maxInteractiveQuality), 200);
                                 }
                                 
@@ -205,10 +188,6 @@ function exportSTL() {
                     isHighQualityMode = false;
                     loadingElement.textContent = 'Loading...';
                     loadingElement.classList.add('hidden');
-                    // Reset back to original position
-                    extrusionPosition.x = originalPosition.x;
-                    extrusionPosition.y = originalPosition.y;
-                    extrusionPosition.z = originalPosition.z;
                 }
             } else {
                 try {
