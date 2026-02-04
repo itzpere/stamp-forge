@@ -114,7 +114,12 @@ function populateShapeList() {
         posXInput.step = '0.1';
         posXInput.value = (shapeInfo.customPosition?.x ?? shapeInfo.mesh.position.x).toFixed(1);
         posXInput.addEventListener('change', () => {
-            updateShapePosition(shapeInfo.id, 'x', parseFloat(posXInput.value));
+            const value = parseFloat(posXInput.value);
+            if (!isNaN(value)) {
+                updateShapePosition(shapeInfo.id, 'x', value);
+            } else {
+                posXInput.value = (shapeInfo.customPosition?.x ?? shapeInfo.mesh.position.x).toFixed(1);
+            }
         });
         posXContainer.appendChild(posXLabel);
         posXContainer.appendChild(posXInput);
@@ -133,7 +138,12 @@ function populateShapeList() {
         posYInput.step = '0.1';
         posYInput.value = (shapeInfo.customPosition?.y ?? shapeInfo.mesh.position.y).toFixed(1);
         posYInput.addEventListener('change', () => {
-            updateShapePosition(shapeInfo.id, 'y', parseFloat(posYInput.value));
+            const value = parseFloat(posYInput.value);
+            if (!isNaN(value)) {
+                updateShapePosition(shapeInfo.id, 'y', value);
+            } else {
+                posYInput.value = (shapeInfo.customPosition?.y ?? shapeInfo.mesh.position.y).toFixed(1);
+            }
         });
         posYContainer.appendChild(posYLabel);
         posYContainer.appendChild(posYInput);
@@ -152,7 +162,12 @@ function populateShapeList() {
         posZInput.step = '0.1';
         posZInput.value = (shapeInfo.customPosition?.z ?? shapeInfo.mesh.position.z).toFixed(1);
         posZInput.addEventListener('change', () => {
-            updateShapePosition(shapeInfo.id, 'z', parseFloat(posZInput.value));
+            const value = parseFloat(posZInput.value);
+            if (!isNaN(value)) {
+                updateShapePosition(shapeInfo.id, 'z', value);
+            } else {
+                posZInput.value = (shapeInfo.customPosition?.z ?? shapeInfo.mesh.position.z).toFixed(1);
+            }
         });
         posZContainer.appendChild(posZLabel);
         posZContainer.appendChild(posZInput);
@@ -185,6 +200,11 @@ function updateShapePosition(shapeId, axis, value) {
     
     // Update both the stored custom position and the mesh position
     if (axis === 'x' || axis === 'y' || axis === 'z') {
+        // Additional safety check to prevent NaN
+        if (isNaN(value)) {
+            console.error(`Invalid position value (NaN) for shape ${shapeId} axis ${axis}`);
+            return;
+        }
         shapeInfo.customPosition[axis] = value;
         shapeInfo.mesh.position[axis] = value;
         

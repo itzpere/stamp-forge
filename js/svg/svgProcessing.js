@@ -228,9 +228,37 @@ if (window.svgProcessingInitialized) {
             qualityFactor = 1.0; 
         }
 
+        // Preserve existing shape data (like customPosition) before any modifications
+        const existingShapeData = new Map();
+        if (window.shapeRenderInfo && window.shapeRenderInfo.length > 0) {
+            window.shapeRenderInfo.forEach(info => {
+                existingShapeData.set(info.id, {
+                    customPosition: info.customPosition,
+                    operationType: info.operationType,
+                    isVisible: info.isVisible,
+                    useReversedWinding: info.useReversedWinding
+                });
+            });
+        }
+
         if (autoSetYOffset && !isExport) {
             const currentExtrusionHeight = (typeof extrusionHeight === 'number' && extrusionHeight > 0) ? extrusionHeight : 0;
-            extrusionPosition.y = currentExtrusionHeight / 2;
+            const newGlobalY = currentExtrusionHeight / 2;
+            
+            // If global Y changed, update preserved custom positions to maintain relative offsets
+            const oldGlobalY = extrusionPosition.y;
+            const yDelta = newGlobalY - oldGlobalY;
+            
+            if (existingShapeData.size > 0 && Math.abs(yDelta) > 0.001) {
+                existingShapeData.forEach((data, id) => {
+                    if (data.customPosition && data.customPosition.y !== undefined) {
+                        // Adjust custom Y position to maintain relative offset from new global baseline
+                        data.customPosition.y += yDelta;
+                    }
+                });
+            }
+            
+            extrusionPosition.y = newGlobalY;
             if (typeof updateExtrusionYUI === 'function') {
                 updateExtrusionYUI(extrusionPosition.y);
             }
@@ -244,19 +272,6 @@ if (window.svgProcessingInitialized) {
         // console.log(`[parseSVGForExtrusion] Initial global svgScaleFactor: ${svgScaleFactor}`);
         // console.log(`[parseSVGForExtrusion] SVG Data Length: ${svgText ? svgText.length : 'null or undefined'}`);
 
-        // Preserve existing shape data (like customPosition) before clearing
-        const existingShapeData = new Map();
-        if (window.shapeRenderInfo && window.shapeRenderInfo.length > 0) {
-            window.shapeRenderInfo.forEach(info => {
-                existingShapeData.set(info.id, {
-                    customPosition: info.customPosition,
-                    operationType: info.operationType,
-                    isVisible: info.isVisible,
-                    useReversedWinding: info.useReversedWinding
-                });
-            });
-        }
-        
         window.shapeRenderInfo = []; 
         window.shapeColorCounter = 0; // Initialize shapeColorCounter
         // Store the preserved data for restoration after shapes are recreated

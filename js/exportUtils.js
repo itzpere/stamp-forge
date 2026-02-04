@@ -113,6 +113,13 @@ function prepareExportGroup() {
 
 function exportSTL() {
     try {
+        // Prevent multiple simultaneous exports
+        if (window._isExporting) {
+            console.warn('Export already in progress');
+            return;
+        }
+        window._isExporting = true;
+        
         const loadingElement = document.getElementById('loading');
         loadingElement.classList.remove('hidden');
         loadingElement.textContent = 'Preparing model for export...';
@@ -173,6 +180,7 @@ function exportSTL() {
                                 
                                 loadingElement.textContent = 'Loading...';
                                 loadingElement.classList.add('hidden');
+                                window._isExporting = false;
                             }, 100);
                         } catch (exportError) {
                             console.error('Error during STL generation:', exportError);
@@ -180,6 +188,7 @@ function exportSTL() {
                             isHighQualityMode = false;
                             loadingElement.textContent = 'Loading...';
                             loadingElement.classList.add('hidden');
+                            window._isExporting = false;
                         }
                     }, 100);
                 } catch (renderError) {
@@ -188,6 +197,7 @@ function exportSTL() {
                     isHighQualityMode = false;
                     loadingElement.textContent = 'Loading...';
                     loadingElement.classList.add('hidden');
+                    window._isExporting = false;
                 }
             } else {
                 try {
@@ -222,6 +232,7 @@ function exportSTL() {
                     isHighQualityMode = false;
                     loadingElement.textContent = 'Loading...';
                     loadingElement.classList.add('hidden');
+                    window._isExporting = false;
                 }
             }
         }, 100);
