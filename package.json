@@ -1,6 +1,6 @@
 {
   "name": "stamp-forge",
-  "version": "1.0.0",
+  "version": "0.0.002",
   "description": "A tool for creating 3D models from SVG files for 3D printing.",
   "main": "server.js",
   "scripts": {

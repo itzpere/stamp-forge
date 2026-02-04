@@ -1383,3 +1383,21 @@ button:disabled {
     max-width: 1600px;
   }
 }
+
+/* App Footer */
+.app-footer {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  padding: 4px 12px;
+  font-size: 11px;
+  color: #666;
+  background-color: rgba(255, 255, 255, 0.8);
+  border-top-left-radius: 4px;
+  z-index: 10;
+  user-select: none;
+}
+
+.app-footer:hover {
+  color: #333;
+}
