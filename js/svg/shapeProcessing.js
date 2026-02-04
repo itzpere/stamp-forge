@@ -16,6 +16,12 @@ window.svgGlobalSettings.shapeExtrusion = window.svgGlobalSettings.shapeExtrusio
 
 
 function createExtrudedShapeWithId(shape, effectiveScaleFromParser_unused, lowQuality, shapeId) {
+    // Check if this shape was deleted by the user
+    if (window._deletedShapeIds && window._deletedShapeIds.has(shapeId)) {
+        console.log(`Skipping deleted shape ID ${shapeId}`);
+        return null;
+    }
+    
     const settings = window.svgGlobalSettings;
     const extrudeConfig = settings.shapeExtrusion;
 

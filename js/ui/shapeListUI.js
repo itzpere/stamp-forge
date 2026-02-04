@@ -77,6 +77,13 @@ function populateShapeList() {
                     }
                 }
             }
+            
+            // Track deleted shape IDs globally so they won't be recreated during re-parsing
+            if (!window._deletedShapeIds) {
+                window._deletedShapeIds = new Set();
+            }
+            window._deletedShapeIds.add(shapeInfo.id);
+            
             const currentIndex = window.shapeRenderInfo.findIndex(item => item.id === shapeInfo.id);
             if (currentIndex > -1) {
                 window.shapeRenderInfo.splice(currentIndex, 1);

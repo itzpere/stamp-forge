@@ -559,6 +559,7 @@ function clearExtrudedDesigns() {
         // Reset shape information
         window.shapeRenderInfo = [];
         window.shapeColorCounter = 0;
+        window._deletedShapeIds = new Set(); // Clear deleted shapes when loading new SVG
         
         // Reset UI elements - FIX THE SVG UPLOAD HANDLING
         try {
